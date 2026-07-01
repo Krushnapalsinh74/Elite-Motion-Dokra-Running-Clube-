@@ -55,6 +55,7 @@ interface ActivityContextType {
   stopActivity: () => Activity | null;
   saveActivity: (activity: Activity) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
+  enableGps: () => Promise<boolean>;
 }
 
 const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
@@ -191,8 +192,13 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(ACTIVITIES_KEY, JSON.stringify(updated));
   }
 
+  async function enableGps(): Promise<boolean> {
+    if (!trackerRef.current) return false;
+    return trackerRef.current.enableGps();
+  }
+
   return (
-    <ActivityContext.Provider value={{ liveMetrics, savedActivities, startActivity, pauseActivity, resumeActivity, stopActivity, saveActivity, deleteActivity }}>
+    <ActivityContext.Provider value={{ liveMetrics, savedActivities, startActivity, pauseActivity, resumeActivity, stopActivity, saveActivity, deleteActivity, enableGps }}>
       {children}
     </ActivityContext.Provider>
   );

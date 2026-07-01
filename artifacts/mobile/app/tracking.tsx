@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -43,7 +42,7 @@ function gpsColor(status: string, conf: number): string {
 }
 
 function gpsLabel(status: string, conf: number, elapsed: number): string {
-  if (status === "simulated") return "Demo Mode";
+  if (status === "simulated") return "No GPS";
   if (elapsed < 5 || status === "acquiring") return "Acquiring GPS...";
   if (status === "locked") return `GPS ${Math.round(conf * 100)}%`;
   if (status === "poor") return "Weak GPS";
@@ -77,67 +76,20 @@ const statStyles = StyleSheet.create({
   label: { fontSize: 10, color: "#999", fontFamily: "Inter_400Regular", marginTop: 1, letterSpacing: 0.3 },
 });
 
-/** Permission states for location */
-type LocPermState = "unknown" | "granted" | "denied" | "blocked";
-
 export default function TrackingScreen() {
-  const { liveMetrics, pauseActivity, resumeActivity, stopActivity } = useActivity();
+  const { liveMetrics, pauseActivity, resumeActivity, stopActivity, enableGps } = useActivity();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
   const isWeb = Platform.OS === "web";
-
-  const [locPerm, setLocPerm] = useState<LocPermState>("unknown");
-
-  // Check location permission as soon as the screen opens
-  useEffect(() => {
-    if (isWeb) { setLocPerm("granted"); return; }
-    checkLocationPermission();
-  }, [isWeb]);
-
-  async function checkLocationPermission() {
-    try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status === "granted") {
-        setLocPerm("granted");
-      } else {
-        // Try to request it — if it was never asked, this shows the dialog
-        const result = await Location.requestForegroundPermissionsAsync();
-        if (result.status === "granted") {
-          setLocPerm("granted");
-        } else if (result.canAskAgain === false) {
-          // "Don't ask again" was selected — send user to Settings
-          setLocPerm("blocked");
-        } else {
-          setLocPerm("denied");
-        }
-      }
-    } catch {
-      setLocPerm("granted"); // Fallback — let the tracker handle it
-    }
-  }
-
-  async function handleRequestPermission() {
-    const result = await Location.requestForegroundPermissionsAsync();
-    if (result.status === "granted") {
-      setLocPerm("granted");
-    } else if (result.canAskAgain === false) {
-      setLocPerm("blocked");
-    } else {
-      setLocPerm("denied");
-    }
-  }
-
-  function openSettings() {
-    Linking.openSettings();
-  }
+  const [enablingGps, setEnablingGps] = useState(false);
+  const [gpsDenied, setGpsDenied] = useState(false);
 
   const coords = liveMetrics?.coords ?? [];
   const lastCoord = coords.length > 0 ? coords[coords.length - 1] : null;
   const isPaused = liveMetrics?.isPaused ?? false;
   const elapsed = liveMetrics?.elapsedSeconds ?? 0;
   const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
-
   const speedKmh = liveMetrics?.currentSpeedKmh ?? 0;
   const speed = speedKmh.toFixed(1);
   const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
@@ -157,15 +109,12 @@ export default function TrackingScreen() {
   useEffect(() => {
     if (lastCoord && mapRef.current && !isWeb) {
       try {
-        mapRef.current.animateToRegion(
-          {
-            latitude: lastCoord.latitude,
-            longitude: lastCoord.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          },
-          500
-        );
+        mapRef.current.animateToRegion({
+          latitude: lastCoord.latitude,
+          longitude: lastCoord.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }, 500);
       } catch {}
     }
   }, [lastCoord, isWeb]);
@@ -176,6 +125,25 @@ export default function TrackingScreen() {
     }
   }, [liveMetrics]);
 
+  // When GPS becomes active (not simulated), clear the denied flag
+  useEffect(() => {
+    if (!isSimulated) setGpsDenied(false);
+  }, [isSimulated]);
+
+  async function handleEnableGps() {
+    setEnablingGps(true);
+    setGpsDenied(false);
+    try {
+      const ok = await enableGps();
+      if (!ok) {
+        // Permission permanently denied — send to Settings
+        setGpsDenied(true);
+      }
+    } finally {
+      setEnablingGps(false);
+    }
+  }
+
   function handlePause() {
     if (isPaused) resumeActivity();
     else pauseActivity();
@@ -185,15 +153,11 @@ export default function TrackingScreen() {
     const doStop = () => {
       const activity = stopActivity();
       if (activity) {
-        router.replace({
-          pathname: "/summary",
-          params: { activityJson: JSON.stringify(activity) },
-        });
+        router.replace({ pathname: "/summary", params: { activityJson: JSON.stringify(activity) } });
       } else {
         router.replace("/(tabs)/");
       }
     };
-
     if (Platform.OS === "web") { doStop(); return; }
     Alert.alert("Finish Activity", "Stop and save this activity?", [
       { text: "Cancel", style: "cancel" },
@@ -227,7 +191,6 @@ export default function TrackingScreen() {
             {isPaused ? "Paused" : LABELS[activityType]}
           </Text>
         </View>
-
         <View style={[styles.pill, styles.shadow]}>
           <View style={[styles.dot, { backgroundColor: dotColor }]} />
           <Text style={[styles.pillText, { fontFamily: "Inter_500Medium" }]}>{statusLabel}</Text>
@@ -235,56 +198,38 @@ export default function TrackingScreen() {
       </View>
 
       {/* Bottom panel */}
-      <View
-        style={[
-          styles.panel,
-          {
-            backgroundColor: "#FFFFFF",
-            paddingBottom: insets.bottom + (isWeb ? 34 : 16),
-            borderTopColor: colors.border,
-          },
-        ]}
-      >
-        {/* Location permission blocked banner */}
-        {locPerm === "blocked" && !isSimulated && (
-          <Pressable
-            onPress={openSettings}
-            style={styles.permBanner}
-          >
+      <View style={[styles.panel, {
+        backgroundColor: "#FFFFFF",
+        paddingBottom: insets.bottom + (isWeb ? 34 : 16),
+        borderTopColor: colors.border,
+      }]}>
+
+        {/* GPS denied permanently → open Settings */}
+        {gpsDenied && (
+          <Pressable onPress={() => Linking.openSettings()} style={[styles.banner, { backgroundColor: "#EF4444" }]}>
             <Feather name="map-pin" size={14} color="#fff" />
-            <Text style={styles.permBannerText}>
-              Location blocked — tap to open Settings and enable it
-            </Text>
+            <Text style={styles.bannerText}>Location blocked — tap to open Settings and enable it</Text>
             <Feather name="external-link" size={13} color="#fff" />
           </Pressable>
         )}
 
-        {/* Location permission denied (can re-ask) */}
-        {locPerm === "denied" && !isSimulated && (
+        {/* GPS in simulation mode → offer to enable real GPS */}
+        {isSimulated && !gpsDenied && !isWeb && (
           <Pressable
-            onPress={handleRequestPermission}
-            style={[styles.permBanner, { backgroundColor: "#F59E0B" }]}
+            onPress={handleEnableGps}
+            disabled={enablingGps}
+            style={[styles.banner, { backgroundColor: enablingGps ? "#93C5FD" : "#3B82F6", opacity: enablingGps ? 0.8 : 1 }]}
           >
             <Feather name="map-pin" size={14} color="#fff" />
-            <Text style={styles.permBannerText}>
-              Tap to allow location access for GPS tracking
+            <Text style={styles.bannerText}>
+              {enablingGps ? "Requesting location permission..." : "Tap to enable real GPS tracking"}
             </Text>
-            <Feather name="chevron-right" size={14} color="#fff" />
+            {!enablingGps && <Feather name="chevron-right" size={14} color="#fff" />}
           </Pressable>
         )}
 
-        {/* Simulation mode banner */}
-        {isSimulated && (
-          <View style={[styles.simBanner, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
-            <Feather name="cpu" size={13} color="#3B82F6" />
-            <Text style={[styles.simText, { color: "#1D4ED8", fontFamily: "Inter_600SemiBold" }]}>
-              Demo Mode — no GPS (tracking simulated)
-            </Text>
-          </View>
-        )}
-
         {/* Paused banner */}
-        {isPaused && !isSimulated && (
+        {isPaused && (
           <View style={[styles.pauseBanner, { backgroundColor: "#FFF7ED", borderColor: "#FDBA74" }]}>
             <Feather name="pause-circle" size={14} color="#F59E0B" />
             <Text style={[styles.pauseText, { color: "#92400E", fontFamily: "Inter_600SemiBold" }]}>
@@ -306,7 +251,7 @@ export default function TrackingScreen() {
           </View>
         </View>
 
-        {/* Secondary metrics row 1: Speed + Pace + Calories */}
+        {/* Secondary metrics row 1 */}
         <View style={[styles.secondaryRow, styles.rowDivider, { borderColor: colors.border }]}>
           <StatBox value={speed} unit="km/h" label="SPEED" />
           <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
@@ -320,15 +265,13 @@ export default function TrackingScreen() {
           <View style={[styles.secondaryRow, styles.rowDivider, { borderColor: colors.border }]}>
             <StatBox
               value={steps > 0 ? String(steps) : "—"}
-              unit="steps"
-              label="STEPS"
+              unit="steps" label="STEPS"
               accent={steps > 0 ? "#6366F1" : undefined}
             />
             <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
             <StatBox
               value={cadence > 0 ? String(cadence) : "—"}
-              unit="spm"
-              label="CADENCE"
+              unit="spm" label="CADENCE"
               accent={cadence > 0 ? "#6366F1" : undefined}
             />
             <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
@@ -340,15 +283,10 @@ export default function TrackingScreen() {
         <View style={styles.accuracyRow}>
           <Text style={[styles.accLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>GPS</Text>
           <View style={[styles.accTrack, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.accFill,
-                {
-                  width: `${isSimulated ? 100 : Math.round(confidence * 100)}%` as `${number}%`,
-                  backgroundColor: dotColor,
-                },
-              ]}
-            />
+            <View style={[styles.accFill, {
+              width: `${isSimulated ? 100 : Math.round(confidence * 100)}%` as `${number}%`,
+              backgroundColor: dotColor,
+            }]} />
           </View>
           <Text style={[styles.accPct, { color: dotColor, fontFamily: "Inter_600SemiBold" }]}>
             {isSimulated ? "SIM" : elapsed < 4 ? "—" : `${Math.round(confidence * 100)}%`}
@@ -359,24 +297,18 @@ export default function TrackingScreen() {
         <View style={styles.controls}>
           <Pressable
             onPress={handlePause}
-            style={({ pressed }) => [
-              styles.pauseBtn,
-              {
-                backgroundColor: isPaused ? colors.primary : "#F3F4F6",
-                borderColor: isPaused ? colors.primary : colors.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
+            style={({ pressed }) => [styles.pauseBtn, {
+              backgroundColor: isPaused ? colors.primary : "#F3F4F6",
+              borderColor: isPaused ? colors.primary : colors.border,
+              opacity: pressed ? 0.7 : 1,
+            }]}
           >
             <Feather name={isPaused ? "play" : "pause"} size={28} color={isPaused ? "#fff" : "#111"} />
           </Pressable>
 
           <Pressable
             onPress={handleStop}
-            style={({ pressed }) => [
-              styles.stopBtn,
-              { backgroundColor: "#EF4444", opacity: pressed ? 0.8 : 1 },
-            ]}
+            style={({ pressed }) => [styles.stopBtn, { backgroundColor: "#EF4444", opacity: pressed ? 0.8 : 1 }]}
           >
             <Feather name="square" size={22} color="#fff" />
           </Pressable>
@@ -389,123 +321,44 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
+    position: "absolute", top: 0, left: 0, right: 0,
+    paddingHorizontal: 16, flexDirection: "row", justifyContent: "space-between", gap: 8,
   },
   pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-    backgroundColor: "#fff",
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: "#fff",
   },
-  shadow: {
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-  },
+  shadow: { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 },
   pillText: { fontSize: 13, color: "#111" },
   dot: { width: 8, height: 8, borderRadius: 4 },
   panel: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 14,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 8,
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    paddingTop: 14, paddingHorizontal: 20, borderTopWidth: 1, gap: 8,
+    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 8,
   },
-  permBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#EF4444",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14,
   },
-  permBannerText: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  simBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  simText: { fontSize: 12, flex: 1 },
+  bannerText: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   pauseBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 8,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, borderRadius: 10, borderWidth: 1, paddingVertical: 8,
   },
   pauseText: { fontSize: 13 },
-  primaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 24,
-  },
+  primaryRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 24 },
   bigMetric: { alignItems: "center", gap: 2 },
   bigVal: { fontSize: 44, color: "#111", letterSpacing: -2 },
   bigUnit: { fontSize: 11, letterSpacing: 2 },
   divV: { width: 1, height: 48 },
-  secondaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingVertical: 6,
-  },
+  secondaryRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-around", paddingVertical: 6 },
   rowDivider: { borderTopWidth: 1 },
   accuracyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   accLabel: { fontSize: 11, width: 28 },
   accTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
   accFill: { height: "100%", borderRadius: 2 },
   accPct: { fontSize: 12, width: 36, textAlign: "right" },
-  controls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    paddingBottom: 4,
-  },
-  pauseBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  stopBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 4 },
+  pauseBtn: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  stopBtn: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
 });

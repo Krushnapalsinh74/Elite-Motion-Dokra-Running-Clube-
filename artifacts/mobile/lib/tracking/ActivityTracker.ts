@@ -129,57 +129,97 @@ export class ActivityTracker {
     await this._startGps();
   }
 
-  private async _startGps() {
+  /**
+   * Called from the UI after the user grants location permission.
+   * Stops simulation (if running) and starts real GPS.
+   */
+  async enableGps(): Promise<boolean> {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        this._startSimulation();
+      if (status !== "granted") return false;
+
+      // Stop simulation if running
+      if (this.simInterval) {
+        clearInterval(this.simInterval);
+        this.simInterval = null;
+      }
+      this.isSimulating = false;
+      this.gpsStatus = "acquiring";
+      this.gpsEngine.reset();
+
+      await this._watchGps();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async _startGps() {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === "granted") {
+        // Already granted — go straight to watching
+        await this._watchGps();
         return;
       }
 
-      this.locationSub = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 0,
-          mayShowUserSettingsDialog: true,
-        },
-        (loc) => {
-          if (this.isPaused) return;
-          const raw = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            accuracy: loc.coords.accuracy ?? 50,
-            speed: loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null,
-            altitude: loc.coords.altitude,
-            timestamp: loc.timestamp,
-          };
-
-          if (raw.accuracy <= 15) {
-            this.gpsStatus = "locked";
-          } else if (raw.accuracy <= 40) {
-            this.gpsStatus = "acquiring";
-          } else {
-            this.gpsStatus = "poor";
-          }
-
-          const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
-          if (!filtered) return;
-
-          if (raw.speed != null) {
-            const gpsSpeedKmh = raw.speed * 3.6;
-            const maxSpeed = this.activityType === "cycling" ? 90 : 40;
-            const clipped = Math.min(gpsSpeedKmh, maxSpeed);
-            this.smoothedSpeedKmh =
-              this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + clipped * SPEED_EMA_ALPHA;
-          }
-
-          this._acceptPoint(filtered);
-        }
-      );
+      // Not yet granted — request it
+      const result = await Location.requestForegroundPermissionsAsync();
+      if (result.status === "granted") {
+        await this._watchGps();
+      } else {
+        this._startSimulation();
+      }
     } catch {
       this._startSimulation();
     }
+  }
+
+  private async _watchGps() {
+    // Remove existing subscription if any
+    try { this.locationSub?.remove(); } catch {}
+    this.locationSub = null;
+
+    this.locationSub = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 0,
+        mayShowUserSettingsDialog: true,
+      },
+      (loc) => {
+        if (this.isPaused) return;
+        const raw = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          accuracy: loc.coords.accuracy ?? 50,
+          speed: loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null,
+          altitude: loc.coords.altitude,
+          timestamp: loc.timestamp,
+        };
+
+        if (raw.accuracy <= 15) {
+          this.gpsStatus = "locked";
+        } else if (raw.accuracy <= 40) {
+          this.gpsStatus = "acquiring";
+        } else {
+          this.gpsStatus = "poor";
+        }
+
+        const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
+        if (!filtered) return;
+
+        if (raw.speed != null) {
+          const gpsSpeedKmh = raw.speed * 3.6;
+          const maxSpeed = this.activityType === "cycling" ? 90 : 40;
+          const clipped = Math.min(gpsSpeedKmh, maxSpeed);
+          this.smoothedSpeedKmh =
+            this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + clipped * SPEED_EMA_ALPHA;
+        }
+
+        this._acceptPoint(filtered);
+      }
+    );
   }
 
   private _startSimulation() {
