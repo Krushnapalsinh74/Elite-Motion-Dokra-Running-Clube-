@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -41,11 +43,11 @@ function gpsColor(status: string, conf: number): string {
 }
 
 function gpsLabel(status: string, conf: number, elapsed: number): string {
-  if (status === "simulated") return "Simulated";
-  if (elapsed < 5 || status === "acquiring") return "Acquiring...";
-  if (status === "locked") return `${Math.round(conf * 100)}% GPS`;
-  if (status === "poor") return "Poor GPS";
-  return `${Math.round(conf * 100)}% GPS`;
+  if (status === "simulated") return "Demo Mode";
+  if (elapsed < 5 || status === "acquiring") return "Acquiring GPS...";
+  if (status === "locked") return `GPS ${Math.round(conf * 100)}%`;
+  if (status === "poor") return "Weak GPS";
+  return `GPS ${Math.round(conf * 100)}%`;
 }
 
 interface StatBoxProps {
@@ -75,6 +77,9 @@ const statStyles = StyleSheet.create({
   label: { fontSize: 10, color: "#999", fontFamily: "Inter_400Regular", marginTop: 1, letterSpacing: 0.3 },
 });
 
+/** Permission states for location */
+type LocPermState = "unknown" | "granted" | "denied" | "blocked";
+
 export default function TrackingScreen() {
   const { liveMetrics, pauseActivity, resumeActivity, stopActivity } = useActivity();
   const colors = useColors();
@@ -82,17 +87,59 @@ export default function TrackingScreen() {
   const mapRef = useRef<any>(null);
   const isWeb = Platform.OS === "web";
 
+  const [locPerm, setLocPerm] = useState<LocPermState>("unknown");
+
+  // Check location permission as soon as the screen opens
+  useEffect(() => {
+    if (isWeb) { setLocPerm("granted"); return; }
+    checkLocationPermission();
+  }, [isWeb]);
+
+  async function checkLocationPermission() {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === "granted") {
+        setLocPerm("granted");
+      } else {
+        // Try to request it — if it was never asked, this shows the dialog
+        const result = await Location.requestForegroundPermissionsAsync();
+        if (result.status === "granted") {
+          setLocPerm("granted");
+        } else if (result.canAskAgain === false) {
+          // "Don't ask again" was selected — send user to Settings
+          setLocPerm("blocked");
+        } else {
+          setLocPerm("denied");
+        }
+      }
+    } catch {
+      setLocPerm("granted"); // Fallback — let the tracker handle it
+    }
+  }
+
+  async function handleRequestPermission() {
+    const result = await Location.requestForegroundPermissionsAsync();
+    if (result.status === "granted") {
+      setLocPerm("granted");
+    } else if (result.canAskAgain === false) {
+      setLocPerm("blocked");
+    } else {
+      setLocPerm("denied");
+    }
+  }
+
+  function openSettings() {
+    Linking.openSettings();
+  }
+
   const coords = liveMetrics?.coords ?? [];
   const lastCoord = coords.length > 0 ? coords[coords.length - 1] : null;
   const isPaused = liveMetrics?.isPaused ?? false;
   const elapsed = liveMetrics?.elapsedSeconds ?? 0;
   const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
 
-  // Use EMA-smoothed current speed for live display
   const speedKmh = liveMetrics?.currentSpeedKmh ?? 0;
   const speed = speedKmh.toFixed(1);
-
-  // Pace is derived from true average speed
   const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
   const calories = liveMetrics?.calories ?? 0;
   const steps = liveMetrics?.steps ?? 0;
@@ -102,6 +149,7 @@ export default function TrackingScreen() {
   const isMoving = liveMetrics?.isMoving ?? false;
   const activityType = liveMetrics?.type ?? "running";
   const isCycling = activityType === "cycling";
+  const isSimulated = gpsStatus === "simulated";
 
   const dotColor = gpsColor(gpsStatus, confidence);
   const statusLabel = gpsLabel(gpsStatus, confidence, elapsed);
@@ -197,7 +245,46 @@ export default function TrackingScreen() {
           },
         ]}
       >
-        {isPaused && (
+        {/* Location permission blocked banner */}
+        {locPerm === "blocked" && !isSimulated && (
+          <Pressable
+            onPress={openSettings}
+            style={styles.permBanner}
+          >
+            <Feather name="map-pin" size={14} color="#fff" />
+            <Text style={styles.permBannerText}>
+              Location blocked — tap to open Settings and enable it
+            </Text>
+            <Feather name="external-link" size={13} color="#fff" />
+          </Pressable>
+        )}
+
+        {/* Location permission denied (can re-ask) */}
+        {locPerm === "denied" && !isSimulated && (
+          <Pressable
+            onPress={handleRequestPermission}
+            style={[styles.permBanner, { backgroundColor: "#F59E0B" }]}
+          >
+            <Feather name="map-pin" size={14} color="#fff" />
+            <Text style={styles.permBannerText}>
+              Tap to allow location access for GPS tracking
+            </Text>
+            <Feather name="chevron-right" size={14} color="#fff" />
+          </Pressable>
+        )}
+
+        {/* Simulation mode banner */}
+        {isSimulated && (
+          <View style={[styles.simBanner, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
+            <Feather name="cpu" size={13} color="#3B82F6" />
+            <Text style={[styles.simText, { color: "#1D4ED8", fontFamily: "Inter_600SemiBold" }]}>
+              Demo Mode — no GPS (tracking simulated)
+            </Text>
+          </View>
+        )}
+
+        {/* Paused banner */}
+        {isPaused && !isSimulated && (
           <View style={[styles.pauseBanner, { backgroundColor: "#FFF7ED", borderColor: "#FDBA74" }]}>
             <Feather name="pause-circle" size={14} color="#F59E0B" />
             <Text style={[styles.pauseText, { color: "#92400E", fontFamily: "Inter_600SemiBold" }]}>
@@ -228,7 +315,7 @@ export default function TrackingScreen() {
           <StatBox value={String(calories)} unit="kcal" label="CALORIES" />
         </View>
 
-        {/* Secondary metrics row 2: Steps + Cadence (always visible; cycling shows cadence as RPM) */}
+        {/* Secondary metrics row 2: Steps + Cadence */}
         {!isCycling && (
           <View style={[styles.secondaryRow, styles.rowDivider, { borderColor: colors.border }]}>
             <StatBox
@@ -245,22 +332,26 @@ export default function TrackingScreen() {
               accent={cadence > 0 ? "#6366F1" : undefined}
             />
             <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
-            <StatBox
-              value={distKm}
-              unit="km"
-              label="DISTANCE"
-            />
+            <StatBox value={distKm} unit="km" label="DISTANCE" />
           </View>
         )}
 
-        {/* Accuracy bar */}
+        {/* GPS accuracy bar */}
         <View style={styles.accuracyRow}>
           <Text style={[styles.accLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>GPS</Text>
           <View style={[styles.accTrack, { backgroundColor: colors.border }]}>
-            <View style={[styles.accFill, { width: `${Math.round(confidence * 100)}%` as `${number}%`, backgroundColor: dotColor }]} />
+            <View
+              style={[
+                styles.accFill,
+                {
+                  width: `${isSimulated ? 100 : Math.round(confidence * 100)}%` as `${number}%`,
+                  backgroundColor: dotColor,
+                },
+              ]}
+            />
           </View>
           <Text style={[styles.accPct, { color: dotColor, fontFamily: "Inter_600SemiBold" }]}>
-            {elapsed < 4 ? "—" : `${Math.round(confidence * 100)}%`}
+            {isSimulated ? "SIM" : elapsed < 4 ? "—" : `${Math.round(confidence * 100)}%`}
           </Text>
         </View>
 
@@ -332,12 +423,37 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingHorizontal: 20,
     borderTopWidth: 1,
-    gap: 10,
+    gap: 8,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 8,
   },
+  permBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  permBannerText: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  simBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  simText: { fontSize: 12, flex: 1 },
   pauseBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -364,9 +480,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     paddingVertical: 6,
   },
-  rowDivider: {
-    borderTopWidth: 1,
-  },
+  rowDivider: { borderTopWidth: 1 },
   accuracyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   accLabel: { fontSize: 11, width: 28 },
   accTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
