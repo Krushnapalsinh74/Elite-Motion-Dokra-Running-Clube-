@@ -1,3 +1,7 @@
 - [Dokra tracking engine](dokra-tracking.md) — 3-layer GPS accuracy: Kalman filter → GpsAccuracyEngine → SensorFusion, all wired by ActivityTracker
 - [Dokra platform map split](dokra-map-split.md) — TrackingMap.tsx (native) + TrackingMap.web.tsx (stub) required to prevent native-only import crash on web
-- [Dokra context API](dokra-context-api.md) — ActivityContext exposes `liveMetrics` (not `liveActivity`); Activity shape has `steps`, `confidence` fields added in v2
+- [Dokra context API](dokra-context-api.md) — ActivityContext exposes `liveMetrics` (not `liveActivity`); Activity shape has `steps`, `confidence`, `isSimulated` fields; LiveMetrics has `gpsStatus` field
+- [Dokra sensor crash fix](dokra-sensors.md) — expo-sensors must be installed via `expo install` (not pnpm add) to get SDK-compatible version; SensorFusion uses dynamic import + try/catch to avoid crash
+- [Dokra Google Auth](dokra-google-auth.md) — expo-auth-session hook requires non-empty clientId; pass placeholder when EXPO_PUBLIC_GOOGLE_CLIENT_ID not set, gate actual OAuth call behind check
+- [Dokra Metro race condition](dokra-metro-race.md) — ENOENT watcher crash after pnpm install is transient; restart workflow after install completes
+- [Dokra theme](dokra-theme.md) — useColors always returns colors.light; app.json userInterfaceStyle: "light"; do NOT read useColorScheme

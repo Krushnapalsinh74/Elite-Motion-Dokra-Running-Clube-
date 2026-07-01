@@ -1,0 +1,388 @@
+Update the existing Flutter sports tracking application.
+
+This is NOT a new project.
+
+Do NOT redesign the UI.
+
+Do NOT remove any existing feature.
+
+Do NOT change navigation or screen layouts.
+
+Only implement and fully integrate the missing production features.
+
+Every feature below must be fully functional. Do not leave placeholders, mock data, fake implementations, TODOs, or simulated values.
+
+1. GOOGLE AUTHENTICATION (MANDATORY)
+
+Replace any existing login with a real production implementation.
+
+Implement:
+
+Official Google Sign-In (OAuth 2.0)
+Firebase Authentication
+Email & Password Login
+Register
+Forgot Password
+Email Verification
+Secure Session
+Auto Login
+Logout
+
+Store in Firestore:
+
+UID
+Name
+Email
+Profile Photo
+Login Time
+Created Time
+
+Do not use fake login.
+
+2. GOOGLE MAPS INTEGRATION (MANDATORY)
+
+Completely integrate Google Maps SDK.
+
+Requirements:
+
+Live map
+User marker
+Follow user
+Smooth camera movement
+Auto rotate
+Zoom controls
+My Location button
+GPS accuracy indicator
+
+Map must update in real time.
+
+3. LIVE ROUTE DRAWING (MANDATORY)
+
+While activity is active:
+
+Draw the travelled route on Google Maps.
+
+Requirements:
+
+Green Start Marker
+Moving Current Marker
+Red Finish Marker
+Continuous Red Polyline
+Smooth Route
+No GPS spikes
+No broken lines
+Append new points only
+Store every coordinate
+
+After activity ends:
+
+Display the complete route.
+
+4. ACCURATE ACTIVITY TRACKING (HIGHEST PRIORITY)
+
+Implement a production-grade tracking engine.
+
+Use:
+
+GPS
+Accelerometer
+Gyroscope
+Magnetometer
+Device Motion Sensors
+Health Connect
+HealthKit
+Smartwatch Sensors
+
+Implement:
+
+Kalman Filter
+GPS Noise Filtering
+Motion Validation
+Distance Smoothing
+Speed Validation
+Auto Pause Detection
+Auto Resume
+Confidence Scoring
+Background Processing
+
+Do NOT count:
+
+GPS Drift
+Phone Shake
+Standing Still
+Vehicle Movement
+Weak GPS Jumps
+
+Distance must increase ONLY when real movement is detected.
+
+5. WALKING MODE
+
+Track:
+
+Steps
+Distance
+Calories
+Duration
+Pace
+Walking Speed
+
+Count steps only while the user is actually walking.
+
+Ignore fake movement.
+
+6. RUNNING MODE
+
+Track:
+
+Distance
+Current Speed
+Average Speed
+Pace
+Splits
+Calories
+Heart Rate
+Cadence
+
+Auto detect:
+
+Walking
+
+Running
+
+Pause
+
+Resume
+
+7. CYCLING MODE
+
+Track:
+
+Distance
+Speed
+Average Speed
+Maximum Speed
+Elevation
+Calories
+Ride Time
+
+Detect:
+
+Stops
+
+Movement
+
+Auto Pause
+
+Resume
+
+8. BACKGROUND TRACKING
+
+Tracking must continue if:
+
+Screen Off
+Phone Locked
+Incoming Call
+App Minimized
+User Opens Another App
+Notification Opened
+
+Do NOT stop:
+
+GPS
+
+Distance
+
+Timer
+
+Route
+
+Calories
+
+Steps
+
+Store everything locally and sync when internet returns.
+
+9. SMARTWATCH INTEGRATION
+
+Implement:
+
+Wear OS
+
+Samsung Galaxy Watch
+
+Pixel Watch
+
+Apple Watch
+
+Health Connect
+
+HealthKit
+
+Synchronize:
+
+Heart Rate
+
+Steps
+
+Calories
+
+Distance
+
+Workout Time
+
+Cadence
+
+Auto reconnect.
+
+Offline sync.
+
+10. ACTIVITY SUMMARY
+
+Generate:
+
+Distance
+
+Duration
+
+Calories
+
+Speed
+
+Pace
+
+Heart Rate
+
+Map
+
+Weather
+
+Start Time
+
+Finish Time
+
+GPS Accuracy
+
+11. ACTIVITY POSTER STUDIO
+
+After workout:
+
+User can:
+
+Upload personal photo
+
+Crop photo
+
+Choose template
+
+Generate poster
+
+Poster must include:
+
+User Photo
+
+Route Map
+
+Distance
+
+Time
+
+Calories
+
+Pace
+
+Activity Name
+
+Date
+
+Location
+
+Brand Logo
+
+Download:
+
+PNG
+
+JPEG
+
+Share:
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+12. FIREBASE DATABASE
+
+Save:
+
+Users
+
+Activities
+
+Routes
+
+GPS Points
+
+Raw Sensor Data
+
+Processed Data
+
+Steps
+
+Calories
+
+Heart Rate
+
+Watch Sync
+
+Poster Images
+
+Analytics
+
+13. ADMIN PANEL
+
+Show:
+
+Users
+
+Activities
+
+Live Routes
+
+GPS Logs
+
+Watch Connections
+
+Analytics
+
+Reports
+
+Poster Gallery
+
+Export CSV
+
+Export Excel
+
+Push Notifications
+
+14. FINAL VALIDATION (MANDATORY)
+
+Before marking the task complete, verify that:
+
+Google Login works with a real Google account.
+Google Maps loads with a valid API key.
+GPS location updates live.
+The travelled route is drawn as a continuous red line.
+Distance is calculated from real GPS movement.
+Walking counts only real steps.
+Running calculates real pace and speed.
+Cycling calculates real ride distance and speed.
+Background tracking continues when the app is minimized or the phone is locked.
+Smartwatch data synchronizes correctly.
+All activity data is saved in Firebase.
+The activity poster is generated from real workout data.
+No feature uses mock data, fake values, or placeholder implementations.
+The project builds successfully with zero critical errors or warnings.
+
+Do not finish the task until every item above is fully implemented and verified.

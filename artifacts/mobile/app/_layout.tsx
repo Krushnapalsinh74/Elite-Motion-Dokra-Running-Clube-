@@ -9,7 +9,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -23,19 +22,21 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const scheme = useColorScheme();
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: scheme === "dark" ? "#0A0A0A" : "#FFFFFF" },
+        contentStyle: { backgroundColor: "#F8F8F8" },
         animation: "fade",
       }}
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="tracking" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }} />
+      <Stack.Screen
+        name="tracking"
+        options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+      />
       <Stack.Screen name="summary" options={{ animation: "slide_from_bottom" }} />
     </Stack>
   );
@@ -50,9 +51,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;

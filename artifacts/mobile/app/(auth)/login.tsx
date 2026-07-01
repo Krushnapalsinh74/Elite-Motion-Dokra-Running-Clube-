@@ -1,7 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -21,100 +19,94 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function LoginScreen() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, register, googleAvailable } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState("");
+
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleSignIn() {
+  async function handleSubmit() {
+    setError("");
     if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
-    setError("");
+    if (mode === "register" && !name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
     setLoading(true);
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await login(email.trim(), password);
+      if (mode === "login") {
+        await login(email.trim(), password);
+      } else {
+        await register(name.trim(), email.trim(), password);
+      }
       router.replace("/(tabs)/");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Sign in failed.");
+      setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGoogle() {
+    setError("");
     setGoogleLoading(true);
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await loginWithGoogle();
       router.replace("/(tabs)/");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Google Sign-In failed.");
     } finally {
       setGoogleLoading(false);
     }
   }
 
+  const isWeb = Platform.OS === "web";
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={["#E85D0408", "#0A0A0A"]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.5 }}
-      />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            {
-              paddingTop: insets.top + (Platform.OS === "web" ? 67 : 40),
-              paddingBottom: insets.bottom + 24,
-            },
+            { paddingTop: insets.top + (isWeb ? 80 : 48), paddingBottom: insets.bottom + 32 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Logo */}
           <View style={styles.logoSection}>
-            <Image
-              source={require("@/assets/images/icon.png")}
-              style={styles.logo}
-              contentFit="contain"
-            />
-            <Text style={[styles.appName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-              DOKRA
-            </Text>
+            <Image source={require("@/assets/images/icon.png")} style={styles.logo} contentFit="contain" />
+            <Text style={[styles.appName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>DOKRA</Text>
             <Text style={[styles.tagline, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>
               RUNNING CLUB
             </Text>
           </View>
 
-          <View style={styles.formSection}>
+          {/* Form */}
+          <View style={styles.form}>
             <Text style={[styles.title, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
               {mode === "login" ? "Welcome back" : "Create account"}
             </Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-              {mode === "login"
-                ? "Sign in to track your runs"
-                : "Join the Dokra community"}
+              {mode === "login" ? "Sign in to track your runs" : "Join the Dokra community"}
             </Text>
 
             {mode === "register" && (
-              <View style={[styles.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Feather name="user" size={18} color={colors.mutedForeground} />
                 <TextInput
                   style={[styles.input, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
-                  placeholder="Full Name"
+                  placeholder="Full name"
                   placeholderTextColor={colors.mutedForeground}
                   value={name}
                   onChangeText={setName}
@@ -123,7 +115,7 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <View style={[styles.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="mail" size={18} color={colors.mutedForeground} />
               <TextInput
                 style={[styles.input, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
@@ -137,7 +129,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View style={[styles.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="lock" size={18} color={colors.mutedForeground} />
               <TextInput
                 style={[styles.input, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
@@ -148,17 +140,20 @@ export default function LoginScreen() {
                 secureTextEntry={!showPass}
                 autoComplete="password"
               />
-              <Pressable onPress={() => setShowPass((v) => !v)}>
+              <Pressable onPress={() => setShowPass((v) => !v)} hitSlop={8}>
                 <Feather name={showPass ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
               </Pressable>
             </View>
 
             {error ? (
-              <Text style={[styles.error, { fontFamily: "Inter_400Regular" }]}>{error}</Text>
+              <View style={[styles.errorBox, { backgroundColor: "#FEF2F2", borderColor: "#FCA5A5" }]}>
+                <Feather name="alert-circle" size={14} color="#EF4444" />
+                <Text style={[styles.errorText, { fontFamily: "Inter_400Regular" }]}>{error}</Text>
+              </View>
             ) : null}
 
             <Pressable
-              onPress={handleSignIn}
+              onPress={handleSubmit}
               disabled={loading}
               style={({ pressed }) => [
                 styles.btnPrimary,
@@ -174,38 +169,52 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            {/* Divider */}
             <View style={styles.divider}>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.divText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                or
-              </Text>
+              <Text style={[styles.divText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>or</Text>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
             </View>
 
+            {/* Google */}
             <Pressable
               onPress={handleGoogle}
               disabled={googleLoading}
               style={({ pressed }) => [
                 styles.btnGoogle,
-                { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed || googleLoading ? 0.7 : 1,
+                },
               ]}
             >
               {googleLoading ? (
-                <ActivityIndicator color={colors.foreground} />
+                <ActivityIndicator color={colors.primary} />
               ) : (
                 <>
-                  <Feather name="globe" size={18} color={colors.foreground} />
+                  {/* Google G icon using text fallback */}
+                  <View style={[styles.googleIcon, { backgroundColor: "#4285F4" }]}>
+                    <Text style={styles.googleG}>G</Text>
+                  </View>
                   <Text style={[styles.btnGoogleText, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                     Continue with Google
                   </Text>
+                  {!googleAvailable && (
+                    <Feather name="info" size={14} color={colors.mutedForeground} />
+                  )}
                 </>
               )}
             </Pressable>
 
-            <Pressable
-              onPress={() => setMode((m) => (m === "login" ? "register" : "login"))}
-              style={styles.switchMode}
-            >
+            {!googleAvailable && (
+              <Text style={[styles.googleNote, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                Set EXPO_PUBLIC_GOOGLE_CLIENT_ID to enable Google Sign-In
+              </Text>
+            )}
+
+            {/* Switch mode */}
+            <Pressable onPress={() => { setMode((m) => (m === "login" ? "register" : "login")); setError(""); }}>
               <Text style={[styles.switchText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
                 {mode === "login" ? "New to Dokra? " : "Already have an account? "}
                 <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>
@@ -224,14 +233,14 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24 },
-  logoSection: { alignItems: "center", marginBottom: 40 },
-  logo: { width: 80, height: 80, marginBottom: 8 },
-  appName: { fontSize: 28, letterSpacing: 6 },
-  tagline: { fontSize: 11, letterSpacing: 4, marginTop: 2 },
-  formSection: { gap: 14 },
-  title: { fontSize: 28, marginBottom: 2 },
-  subtitle: { fontSize: 15, marginBottom: 8 },
-  inputWrap: {
+  logoSection: { alignItems: "center", marginBottom: 36, gap: 4 },
+  logo: { width: 72, height: 72, marginBottom: 6 },
+  appName: { fontSize: 26, letterSpacing: 6 },
+  tagline: { fontSize: 11, letterSpacing: 4 },
+  form: { gap: 14 },
+  title: { fontSize: 26 },
+  subtitle: { fontSize: 14, marginBottom: 4 },
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
@@ -241,13 +250,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   input: { flex: 1, fontSize: 15 },
-  error: { color: "#EF4444", fontSize: 13, textAlign: "center" },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+  },
+  errorText: { color: "#EF4444", fontSize: 13, flex: 1 },
   btnPrimary: {
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
   },
   btnPrimaryText: { color: "#fff", fontSize: 16 },
   divider: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -259,10 +275,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 10,
   },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleG: { color: "#fff", fontSize: 13, fontWeight: "700" },
   btnGoogleText: { fontSize: 15 },
-  switchMode: { alignItems: "center", paddingTop: 8 },
-  switchText: { fontSize: 14 },
+  googleNote: { fontSize: 11, textAlign: "center", marginTop: -4 },
+  switchText: { fontSize: 14, textAlign: "center" },
 });

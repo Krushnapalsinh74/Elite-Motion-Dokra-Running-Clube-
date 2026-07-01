@@ -1,14 +1,3 @@
-/**
- * ActivityContext — powered by the high-accuracy ActivityTracker engine.
- *
- * Replaces the original basic GPS implementation with:
- *   - Kalman-filtered GPS
- *   - Accelerometer motion detection
- *   - Step counter (pedometer)
- *   - Speed validation + outlier rejection
- *   - Confidence scoring
- */
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
@@ -36,6 +25,7 @@ export interface Activity {
   calories: number;
   steps: number;
   confidence: number;
+  isSimulated: boolean;
   coords: Coord[];
 }
 
@@ -52,6 +42,7 @@ export interface LiveMetrics {
   isMoving: boolean;
   isPaused: boolean;
   elapsedSeconds: number;
+  gpsStatus: "acquiring" | "locked" | "poor" | "simulated";
   coords: Coord[];
 }
 
@@ -75,13 +66,10 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const trackerRef = useRef<ActivityTracker | null>(null);
   const typeRef = useRef<ActivityType>("running");
   const isPausedRef = useRef(false);
-  const lastUpdateRef = useRef<TrackingUpdate | null>(null);
 
   useEffect(() => {
     loadActivities();
-    return () => {
-      trackerRef.current?.stop();
-    };
+    return () => { try { trackerRef.current?.stop(); } catch {} };
   }, []);
 
   async function loadActivities() {
@@ -92,13 +80,11 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function startActivity(type: ActivityType) {
-    // Clean up any existing tracker
-    trackerRef.current?.stop();
+    try { trackerRef.current?.stop(); } catch {}
     typeRef.current = type;
     isPausedRef.current = false;
 
     const tracker = new ActivityTracker(type, (update: TrackingUpdate) => {
-      lastUpdateRef.current = update;
       setLiveMetrics({
         type,
         distanceM: update.distanceM,
@@ -112,6 +98,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
         isMoving: update.isMoving,
         isPaused: isPausedRef.current,
         elapsedSeconds: update.elapsedSeconds,
+        gpsStatus: update.gpsStatus,
         coords: update.coords.map((c) => ({
           latitude: c.latitude,
           longitude: c.longitude,
@@ -124,7 +111,6 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
     trackerRef.current = tracker;
 
-    // Initialise metrics immediately so the tracking screen renders
     setLiveMetrics({
       type,
       distanceM: 0,
@@ -138,6 +124,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       isMoving: false,
       isPaused: false,
       elapsedSeconds: 0,
+      gpsStatus: "acquiring",
       coords: [],
     });
 
@@ -158,7 +145,6 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
   function stopActivity(): Activity | null {
     if (!trackerRef.current) return null;
-
     const result = trackerRef.current.stop();
     trackerRef.current = null;
 
@@ -177,6 +163,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       calories: result.calories,
       steps: result.steps,
       confidence: result.confidence,
+      isSimulated: result.isSimulated,
       coords: result.coords.map((c) => ({
         latitude: c.latitude,
         longitude: c.longitude,
@@ -203,18 +190,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ActivityContext.Provider
-      value={{
-        liveMetrics,
-        savedActivities,
-        startActivity,
-        pauseActivity,
-        resumeActivity,
-        stopActivity,
-        saveActivity,
-        deleteActivity,
-      }}
-    >
+    <ActivityContext.Provider value={{ liveMetrics, savedActivities, startActivity, pauseActivity, resumeActivity, stopActivity, saveActivity, deleteActivity }}>
       {children}
     </ActivityContext.Provider>
   );

@@ -1,12 +1,10 @@
 /**
- * ActivityTracker — the top-level coordinator.
+ * ActivityTracker — top-level coordinator.
  *
- * Wires together:
- *   GpsAccuracyEngine  → validates + Kalman-filters GPS points
- *   SensorFusion       → accelerometer motion detection + step counter
- *   Location watch     → raw GPS stream from expo-location
- *
- * Emits a single `TrackingUpdate` on every accepted GPS event.
+ * Fixes:
+ * - Sends timer updates every second regardless of GPS
+ * - Proper GPS permission handling
+ * - Better initial state (not stuck at 0%)
  */
 
 import * as Location from "expo-location";
@@ -38,18 +36,17 @@ export interface TrackingUpdate {
   confidence: number;
   isMoving: boolean;
   elapsedSeconds: number;
+  gpsStatus: "acquiring" | "locked" | "poor" | "simulated";
 }
 
 export type TrackingCallback = (update: TrackingUpdate) => void;
 
-// MET values for calorie calculation
 const MET: Record<ActivityType, number> = {
   walking: 3.8,
   running: 9.8,
   cycling: 7.5,
 };
 
-// Web simulation speeds (km/h) — demo data when GPS isn't available
 const SIM_SPEED: Record<ActivityType, number> = {
   walking: 5.2,
   running: 10.5,
@@ -61,6 +58,7 @@ export class ActivityTracker {
   private sensorFusion: SensorFusion;
   private locationSub: Location.LocationSubscription | null = null;
   private simInterval: ReturnType<typeof setInterval> | null = null;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
 
   private coords: TrackingPoint[] = [];
   private distanceM = 0;
@@ -74,19 +72,16 @@ export class ActivityTracker {
   private onUpdate: TrackingCallback;
   private activityType: ActivityType;
   private weightKg: number;
+  private isSimulating = false;
+  private gpsStatus: TrackingUpdate["gpsStatus"] = "acquiring";
+  private lastUpdateTime = 0;
 
-  constructor(
-    activityType: ActivityType,
-    onUpdate: TrackingCallback,
-    weightKg = 70
-  ) {
+  constructor(activityType: ActivityType, onUpdate: TrackingCallback, weightKg = 70) {
     this.activityType = activityType;
     this.onUpdate = onUpdate;
     this.weightKg = weightKg;
     this.gpsEngine = new GpsAccuracyEngine(activityType);
-    this.sensorFusion = new SensorFusion((state) => {
-      this.motionState = state;
-    });
+    this.sensorFusion = new SensorFusion((state) => { this.motionState = state; });
   }
 
   async start() {
@@ -96,9 +91,14 @@ export class ActivityTracker {
     this.pausedMs = 0;
     this.isPaused = false;
     this.gpsEngine.reset();
+    this.gpsStatus = "acquiring";
 
-    // Start accelerometer + pedometer
     await this.sensorFusion.start(this.activityType);
+
+    // Independent 1-second timer so elapsed always updates
+    this.timerInterval = setInterval(() => {
+      if (!this.isPaused) this._emitUpdate();
+    }, 1000);
 
     if (Platform.OS !== "web") {
       await this._startGps();
@@ -108,85 +108,84 @@ export class ActivityTracker {
   }
 
   private async _startGps() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      this._startSimulation();
-      return;
-    }
-
-    this.locationSub = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 1000,
-        distanceInterval: 0, // receive ALL updates, filter ourselves
-        mayShowUserSettingsDialog: true,
-      },
-      (loc) => {
-        if (this.isPaused) return;
-        this._handleRawGps(loc);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        this._startSimulation();
+        return;
       }
-    );
-  }
 
-  private _handleRawGps(loc: Location.LocationObject) {
-    const raw = {
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-      accuracy: loc.coords.accuracy ?? 100,
-      speed: loc.coords.speed,
-      altitude: loc.coords.altitude,
-      timestamp: loc.timestamp,
-    };
+      this.locationSub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 0,
+          mayShowUserSettingsDialog: true,
+        },
+        (loc) => {
+          if (this.isPaused) return;
+          const raw = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            accuracy: loc.coords.accuracy ?? 50,
+            speed: loc.coords.speed,
+            altitude: loc.coords.altitude,
+            timestamp: loc.timestamp,
+          };
 
-    const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
-    if (!filtered) return;
+          // Update GPS status based on accuracy
+          if (raw.accuracy <= 15) {
+            this.gpsStatus = "locked";
+          } else if (raw.accuracy <= 40) {
+            this.gpsStatus = "acquiring";
+          } else {
+            this.gpsStatus = "poor";
+          }
 
-    this._acceptPoint(filtered);
+          const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
+          if (!filtered) return;
+          this._acceptPoint(filtered);
+        }
+      );
+    } catch {
+      this._startSimulation();
+    }
   }
 
   private _startSimulation() {
-    // Simulate realistic movement for web / no-GPS dev testing
+    this.isSimulating = true;
+    this.gpsStatus = "simulated";
     const speedKmh = SIM_SPEED[this.activityType];
     const speedMs = speedKmh / 3.6;
     const baseLat = 28.6139;
     const baseLon = 77.2090;
     let step = 0;
-    const startTs = Date.now();
 
     this.simInterval = setInterval(() => {
       if (this.isPaused) return;
       step++;
       const ts = Date.now();
-      const dtS = 2; // 2-second interval
-
-      // Move north-east in a curve to look realistic
       const angle = (step * 5 * Math.PI) / 180;
-      const dist = speedMs * dtS;
+      const dist = speedMs * 2;
       const latDelta = (dist * Math.cos(angle)) / 111320;
       const lonDelta = (dist * Math.sin(angle)) / (111320 * Math.cos((baseLat * Math.PI) / 180));
 
-      const lat = baseLat + step * latDelta;
-      const lon = baseLon + step * lonDelta;
-
       const filtered: FilteredPoint = {
-        latitude: lat,
-        longitude: lon,
-        altitude: 215 + Math.sin(step * 0.1) * 5,
+        latitude: baseLat + step * latDelta,
+        longitude: baseLon + step * lonDelta,
+        altitude: 215,
         timestamp: ts,
-        accuracy: 5 + Math.random() * 3,
+        accuracy: 5,
         confidence: 0.92,
         isMoving: true,
       };
-
-      // Update motion state for web
       this.motionState = {
         isMoving: true,
         magnitude: 9.8,
-        steps: Math.round(step * (speedKmh < 10 ? 2.5 : 1.8)),
-        stepsPerMinute: this.activityType === "cycling" ? 0 : 150,
+        steps: Math.round(step * 2.4),
+        stepsPerMinute: this.activityType === "cycling" ? 0 : 155,
         confidence: 0.9,
       };
-
       this._acceptPoint(filtered);
     }, 2000);
   }
@@ -201,42 +200,40 @@ export class ActivityTracker {
       confidence: pt.confidence,
     };
 
-    // Compute incremental distance
     if (this.coords.length > 0 && pt.isMoving) {
       const prev = this.coords[this.coords.length - 1];
       const d = haversineM(prev.latitude, prev.longitude, tp.latitude, tp.longitude);
-      this.distanceM += d;
+      if (d < 500) this.distanceM += d; // ignore GPS jumps > 500m
     }
-
     this.coords.push(tp);
+    this._emitUpdate(pt.confidence, pt.isMoving);
+  }
 
-    // Speed
+  private _emitUpdate(confidence?: number, isMoving?: boolean) {
     const elapsedS = this._elapsedSeconds();
-    const speedKmh = pt.isMoving ? (this.lastSpeedKmh * 0.7 + this._instantSpeed() * 0.3) : 0;
-    this.lastSpeedKmh = speedKmh;
+    const conf = confidence ?? (this.coords.length > 0 ? this.coords[this.coords.length - 1].confidence : 0);
+    const moving = isMoving ?? this.motionState.isMoving;
+    const speedKmh = this._instantSpeed();
     this.speedHistory.push(speedKmh);
     if (this.speedHistory.length > 30) this.speedHistory.shift();
 
-    const avgSpeedKmh =
-      this.speedHistory.length > 0
-        ? this.speedHistory.reduce((a, b) => a + b, 0) / this.speedHistory.length
-        : 0;
-
-    const avgPace = avgSpeedKmh > 0 ? 60 / avgSpeedKmh : 0;
-    const calories = this._calcCalories(elapsedS);
+    const avgSpeed = this.speedHistory.length > 0
+      ? this.speedHistory.reduce((a, b) => a + b, 0) / this.speedHistory.length
+      : 0;
 
     this.onUpdate({
       coords: [...this.coords],
       distanceM: this.distanceM,
       currentSpeedKmh: speedKmh,
-      avgSpeedKmh,
-      avgPaceMinPerKm: avgPace,
-      calories,
+      avgSpeedKmh: avgSpeed,
+      avgPaceMinPerKm: avgSpeed > 0 ? 60 / avgSpeed : 0,
+      calories: this._calcCalories(elapsedS),
       steps: this.motionState.steps,
       cadence: this.motionState.stepsPerMinute,
-      confidence: pt.confidence,
-      isMoving: pt.isMoving,
+      confidence: conf,
+      isMoving: moving,
       elapsedSeconds: elapsedS,
+      gpsStatus: this.gpsStatus,
     });
   }
 
@@ -246,19 +243,16 @@ export class ActivityTracker {
     const b = this.coords[this.coords.length - 1];
     const dtS = Math.max((b.timestamp - a.timestamp) / 1000, 0.1);
     const distM = haversineM(a.latitude, a.longitude, b.latitude, b.longitude);
-    return (distM / dtS) * 3.6;
+    return Math.min((distM / dtS) * 3.6, this.activityType === "cycling" ? 90 : 40);
   }
 
   private _elapsedSeconds(): number {
-    const pausedExtra = this.pauseStart
-      ? Date.now() - this.pauseStart
-      : 0;
-    return (Date.now() - this.startTime - this.pausedMs - pausedExtra) / 1000;
+    const pausedExtra = this.pauseStart ? Date.now() - this.pauseStart : 0;
+    return Math.max(0, (Date.now() - this.startTime - this.pausedMs - pausedExtra) / 1000);
   }
 
   private _calcCalories(durationS: number): number {
-    const met = MET[this.activityType];
-    return Math.round(met * this.weightKg * (durationS / 3600));
+    return Math.round(MET[this.activityType] * this.weightKg * (durationS / 3600));
   }
 
   pause() {
@@ -274,24 +268,15 @@ export class ActivityTracker {
     this.isPaused = false;
   }
 
-  stop(): {
-    coords: TrackingPoint[];
-    distanceM: number;
-    durationS: number;
-    avgSpeedKmh: number;
-    avgPaceMinPerKm: number;
-    calories: number;
-    steps: number;
-    confidence: number;
-  } {
-    this.locationSub?.remove();
+  stop() {
+    try { this.locationSub?.remove(); } catch {}
     if (this.simInterval) clearInterval(this.simInterval);
+    if (this.timerInterval) clearInterval(this.timerInterval);
     this.sensorFusion.stop();
 
     const durationS = this._elapsedSeconds();
     const avgSpeedKmh = durationS > 0 ? (this.distanceM / 1000) / (durationS / 3600) : 0;
     const avgPaceMinPerKm = avgSpeedKmh > 0 ? 60 / avgSpeedKmh : 0;
-    const calories = this._calcCalories(durationS);
     const confidence = this.coords.length > 0
       ? this.coords.reduce((s, c) => s + c.confidence, 0) / this.coords.length
       : 0;
@@ -302,9 +287,10 @@ export class ActivityTracker {
       durationS,
       avgSpeedKmh,
       avgPaceMinPerKm,
-      calories,
+      calories: this._calcCalories(durationS),
       steps: this.motionState.steps,
       confidence,
+      isSimulated: this.isSimulating,
     };
   }
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import MapView, { Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 
 interface Coord {
   latitude: number;
@@ -20,7 +20,16 @@ interface TrackingMapProps {
   primaryColor: string;
 }
 
-export default function TrackingMap({ mapRef, initialRegion, polylineCoords, isPaused, primaryColor }: TrackingMapProps) {
+export default function TrackingMap({
+  mapRef,
+  initialRegion,
+  polylineCoords,
+  isPaused,
+  primaryColor,
+}: TrackingMapProps) {
+  const startCoord = polylineCoords.length > 0 ? polylineCoords[0] : null;
+  const endCoord = polylineCoords.length > 1 ? polylineCoords[polylineCoords.length - 1] : null;
+
   return (
     <MapView
       ref={mapRef}
@@ -30,14 +39,20 @@ export default function TrackingMap({ mapRef, initialRegion, polylineCoords, isP
       showsUserLocation
       followsUserLocation={!isPaused}
       mapType="standard"
-      customMapStyle={darkMapStyle}
       showsMyLocationButton={false}
-      showsCompass={false}
+      showsCompass
+      showsScale
     >
+      {startCoord && (
+        <Marker coordinate={startCoord} pinColor="green" title="Start" />
+      )}
+      {endCoord && (
+        <Marker coordinate={endCoord} pinColor={primaryColor} title="Current" />
+      )}
       {polylineCoords.length > 1 && (
         <Polyline
           coordinates={polylineCoords}
-          strokeColor={primaryColor}
+          strokeColor={isPaused ? "#9E9E9E" : primaryColor}
           strokeWidth={4}
           lineCap="round"
           lineJoin="round"
@@ -46,12 +61,3 @@ export default function TrackingMap({ mapRef, initialRegion, polylineCoords, isP
     </MapView>
   );
 }
-
-const darkMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2c2c2c" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3c3c3c" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a0a0a" }] },
-];

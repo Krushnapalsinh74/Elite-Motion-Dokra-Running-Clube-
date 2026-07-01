@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Alert,
   Platform,
@@ -20,32 +19,42 @@ import { useColors } from "@/hooks/useColors";
 const LABELS = { walking: "Walking", running: "Running", cycling: "Cycling" };
 
 function fmtTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
 function fmtPace(minPerKm: number): string {
-  if (minPerKm <= 0 || !isFinite(minPerKm)) return "--:--";
+  if (!minPerKm || minPerKm <= 0 || !isFinite(minPerKm) || minPerKm > 60) return "--:--";
   const m = Math.floor(minPerKm);
   const s = Math.round((minPerKm - m) * 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function confidenceColor(c: number): string {
-  if (c >= 0.8) return "#10B981"; // green
-  if (c >= 0.5) return "#F59E0B"; // amber
-  return "#EF4444"; // red
+function gpsStatusColor(status: string, conf: number): string {
+  if (status === "simulated") return "#3B82F6";
+  if (status === "locked" || conf >= 0.7) return "#10B981";
+  if (status === "acquiring" || conf >= 0.4) return "#F59E0B";
+  return "#EF4444";
+}
+
+function gpsStatusLabel(status: string, conf: number, elapsed: number): string {
+  if (status === "simulated") return "Simulated";
+  if (elapsed < 5) return "Acquiring...";
+  if (status === "locked") return `${Math.round(conf * 100)}% GPS`;
+  if (status === "acquiring") return "Acquiring...";
+  if (status === "poor") return "Poor GPS";
+  return `${Math.round(conf * 100)}% GPS`;
 }
 
 export default function TrackingScreen() {
-  const { liveMetrics, pauseActivity, resumeActivity, stopActivity, saveActivity } = useActivity();
+  const { liveMetrics, pauseActivity, resumeActivity, stopActivity } = useActivity();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
-  const [locked, setLocked] = useState(false);
   const isWeb = Platform.OS === "web";
 
   const coords = liveMetrics?.coords ?? [];
@@ -53,13 +62,18 @@ export default function TrackingScreen() {
   const isPaused = liveMetrics?.isPaused ?? false;
   const elapsed = liveMetrics?.elapsedSeconds ?? 0;
   const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
-  const speedStr = (liveMetrics?.currentSpeedKmh ?? 0).toFixed(1);
+  const speed = (liveMetrics?.currentSpeedKmh ?? 0).toFixed(1);
   const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
   const calories = liveMetrics?.calories ?? 0;
   const steps = liveMetrics?.steps ?? 0;
   const cadence = liveMetrics?.cadence ?? 0;
   const confidence = liveMetrics?.confidence ?? 0;
+  const gpsStatus = liveMetrics?.gpsStatus ?? "acquiring";
   const isMoving = liveMetrics?.isMoving ?? false;
+  const activityType = liveMetrics?.type ?? "running";
+
+  const dotColor = gpsStatusColor(gpsStatus, confidence);
+  const statusLabel = gpsStatusLabel(gpsStatus, confidence, elapsed);
 
   useEffect(() => {
     if (lastCoord && mapRef.current && !isWeb) {
@@ -82,207 +96,164 @@ export default function TrackingScreen() {
   }, [liveMetrics]);
 
   function handlePause() {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (isPaused) {
-      resumeActivity();
-    } else {
-      pauseActivity();
-    }
+    if (isPaused) resumeActivity();
+    else pauseActivity();
   }
 
   function handleStop() {
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    const doStop = () => {
+      const activity = stopActivity();
+      if (activity) {
+        router.replace({
+          pathname: "/summary",
+          params: { activityJson: JSON.stringify(activity) },
+        });
+      } else {
+        router.replace("/(tabs)/");
+      }
+    };
+
     if (Platform.OS === "web") {
-      finishActivity();
+      doStop();
       return;
     }
     Alert.alert("Finish Activity", "Stop and save this activity?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Stop", style: "destructive", onPress: finishActivity },
+      { text: "Stop", style: "destructive", onPress: doStop },
     ]);
   }
 
-  function finishActivity() {
-    const activity = stopActivity();
-    if (activity) {
-      router.replace({
-        pathname: "/summary",
-        params: { activityId: activity.id, activityJson: JSON.stringify(activity) },
-      });
-    } else {
-      router.replace("/(tabs)/");
-    }
-  }
-
-  const mapInitialRegion = {
+  const initialRegion = {
     latitude: lastCoord?.latitude ?? 28.6139,
     longitude: lastCoord?.longitude ?? 77.209,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.008,
+    longitudeDelta: 0.008,
   };
-
   const polylineCoords = coords.map((c) => ({ latitude: c.latitude, longitude: c.longitude }));
 
   return (
-    <View style={[styles.root, { backgroundColor: "#0A0A0A" }]}>
+    <View style={[styles.root, { backgroundColor: "#F0F0F0" }]}>
       <TrackingMap
         mapRef={mapRef}
-        initialRegion={mapInitialRegion}
+        initialRegion={initialRegion}
         polylineCoords={polylineCoords}
         isPaused={isPaused}
         primaryColor={colors.primary}
       />
 
-      {/* Top status bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + (isWeb ? 67 : 12) }]}>
-        <View style={[styles.statusPill, { backgroundColor: "#000000CC" }]}>
+      {/* Top bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + (isWeb ? 67 : 14) }]}>
+        {/* Activity type pill */}
+        <View style={[styles.pill, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
           <View style={[styles.dot, { backgroundColor: isPaused ? "#F59E0B" : isMoving ? "#10B981" : "#9E9E9E" }]} />
-          <Text style={[styles.statusText, { color: "#fff", fontFamily: "Inter_500Medium" }]}>
-            {isPaused ? "Paused" : isMoving ? (liveMetrics ? LABELS[liveMetrics.type] : "Active") : "Waiting for GPS…"}
+          <Text style={[styles.pillText, { color: "#111", fontFamily: "Inter_600SemiBold" }]}>
+            {isPaused ? "Paused" : LABELS[activityType]}
           </Text>
         </View>
 
-        {/* GPS Confidence chip */}
-        <View style={[styles.confidenceChip, { backgroundColor: "#000000CC" }]}>
-          <View style={[styles.dot, { backgroundColor: confidenceColor(confidence) }]} />
-          <Text style={[styles.confidenceText, { color: "#fff", fontFamily: "Inter_400Regular" }]}>
-            {Math.round(confidence * 100)}% GPS
+        {/* GPS status */}
+        <View style={[styles.pill, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
+          <View style={[styles.dot, { backgroundColor: dotColor }]} />
+          <Text style={[styles.pillText, { color: "#111", fontFamily: "Inter_500Medium" }]}>
+            {statusLabel}
           </Text>
         </View>
       </View>
 
-      {/* Bottom metrics panel */}
+      {/* Bottom panel */}
       <View
         style={[
-          styles.metricsPanel,
+          styles.panel,
           {
-            backgroundColor: "#000000EE",
-            paddingBottom: insets.bottom + (isWeb ? 34 : 20),
-            borderTopColor: "#2A2A2A",
+            backgroundColor: "#FFFFFF",
+            paddingBottom: insets.bottom + (isWeb ? 34 : 16),
+            borderTopColor: colors.border,
           },
         ]}
       >
         {isPaused && (
-          <View style={[styles.pausedBanner, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B55" }]}>
+          <View style={[styles.pauseBanner, { backgroundColor: "#FFF7ED", borderColor: "#FDBA74" }]}>
             <Feather name="pause-circle" size={14} color="#F59E0B" />
-            <Text style={[styles.pausedText, { color: "#F59E0B", fontFamily: "Inter_600SemiBold" }]}>
+            <Text style={[styles.pauseText, { color: "#92400E", fontFamily: "Inter_600SemiBold" }]}>
               Activity Paused
             </Text>
           </View>
         )}
 
-        {/* Primary metrics: distance + time */}
+        {/* Main metrics */}
         <View style={styles.mainMetrics}>
           <View style={styles.bigMetric}>
-            <Text style={[styles.bigValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
-            <Text style={[styles.bigLabel, { color: "#9E9E9E", fontFamily: "Inter_500Medium" }]}>KM</Text>
+            <Text style={[styles.bigValue, { color: "#111", fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
+            <Text style={[styles.bigLabel, { color: "#6B7280", fontFamily: "Inter_500Medium" }]}>KM</Text>
           </View>
-          <View style={[styles.dividerV, { backgroundColor: "#2A2A2A" }]} />
+          <View style={[styles.divV, { backgroundColor: colors.border }]} />
           <View style={styles.bigMetric}>
-            <Text style={[styles.bigValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{fmtTime(elapsed)}</Text>
-            <Text style={[styles.bigLabel, { color: "#9E9E9E", fontFamily: "Inter_500Medium" }]}>TIME</Text>
+            <Text style={[styles.bigValue, { color: "#111", fontFamily: "Inter_700Bold" }]}>{fmtTime(elapsed)}</Text>
+            <Text style={[styles.bigLabel, { color: "#6B7280", fontFamily: "Inter_500Medium" }]}>TIME</Text>
           </View>
         </View>
 
         {/* Secondary metrics */}
-        <View style={styles.smallMetrics}>
-          <View style={styles.smallMetric}>
-            <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{speedStr}</Text>
-            <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>km/h</Text>
-          </View>
-          <View style={styles.smallMetric}>
-            <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{pace}</Text>
-            <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>/km</Text>
-          </View>
-          <View style={styles.smallMetric}>
-            <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{calories}</Text>
-            <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>kcal</Text>
-          </View>
-          {steps > 0 && (
-            <View style={styles.smallMetric}>
-              <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{steps}</Text>
-              <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>steps</Text>
+        <View style={styles.secondaryRow}>
+          {[
+            { val: speed, unit: "km/h" },
+            { val: pace, unit: "/km" },
+            { val: String(calories), unit: "kcal" },
+            ...(steps > 0 ? [{ val: String(steps), unit: "steps" }] : []),
+            ...(cadence > 0 ? [{ val: String(cadence), unit: "spm" }] : []),
+          ].map((m, i) => (
+            <View key={i} style={styles.secondaryStat}>
+              <Text style={[styles.secondaryVal, { color: "#111", fontFamily: "Inter_700Bold" }]}>{m.val}</Text>
+              <Text style={[styles.secondaryUnit, { color: "#6B7280", fontFamily: "Inter_400Regular" }]}>{m.unit}</Text>
             </View>
-          )}
-          {cadence > 0 && (
-            <View style={styles.smallMetric}>
-              <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{cadence}</Text>
-              <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>spm</Text>
-            </View>
-          )}
+          ))}
         </View>
 
-        {/* Accuracy bar */}
+        {/* GPS accuracy bar */}
         <View style={styles.accuracyRow}>
-          <Text style={[styles.accuracyLabel, { color: "#666", fontFamily: "Inter_400Regular" }]}>
-            Accuracy
-          </Text>
-          <View style={[styles.accuracyTrack, { backgroundColor: "#2A2A2A" }]}>
+          <Text style={[styles.accLabel, { color: "#6B7280", fontFamily: "Inter_400Regular" }]}>Accuracy</Text>
+          <View style={[styles.accTrack, { backgroundColor: colors.border }]}>
             <View
               style={[
-                styles.accuracyFill,
+                styles.accFill,
                 {
                   width: `${Math.round(confidence * 100)}%` as `${number}%`,
-                  backgroundColor: confidenceColor(confidence),
+                  backgroundColor: dotColor,
                 },
               ]}
             />
           </View>
-          <Text style={[styles.accuracyPct, { color: confidenceColor(confidence), fontFamily: "Inter_600SemiBold" }]}>
-            {Math.round(confidence * 100)}%
+          <Text style={[styles.accPct, { color: dotColor, fontFamily: "Inter_600SemiBold" }]}>
+            {elapsed < 3 ? "—" : `${Math.round(confidence * 100)}%`}
           </Text>
         </View>
 
-        {/* Control buttons */}
-        {!locked ? (
-          <View style={styles.buttons}>
-            <Pressable
-              onPress={() => setLocked(true)}
-              style={({ pressed }) => [
-                styles.iconBtn,
-                { backgroundColor: "#1C1C1C", opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Feather name="lock" size={20} color="#9E9E9E" />
-            </Pressable>
+        {/* Buttons */}
+        <View style={styles.buttons}>
+          <Pressable
+            onPress={handlePause}
+            style={({ pressed }) => [
+              styles.pauseBtn,
+              {
+                backgroundColor: isPaused ? colors.primary : "#F3F4F6",
+                borderColor: isPaused ? colors.primary : colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Feather name={isPaused ? "play" : "pause"} size={28} color={isPaused ? "#fff" : "#111"} />
+          </Pressable>
 
-            <Pressable
-              onPress={handlePause}
-              style={({ pressed }) => [
-                styles.pauseBtn,
-                {
-                  backgroundColor: isPaused ? colors.primary : "#1C1C1C",
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Feather name={isPaused ? "play" : "pause"} size={28} color="#fff" />
-            </Pressable>
-
-            <Pressable
-              onPress={handleStop}
-              style={({ pressed }) => [
-                styles.stopBtn,
-                { backgroundColor: "#EF4444", opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Feather name="square" size={22} color="#fff" />
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.lockedRow}>
-            <Text style={[styles.lockedHint, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>
-              Screen locked — tap to unlock
-            </Text>
-            <Pressable
-              onPress={() => setLocked(false)}
-              style={[styles.unlockBtn, { backgroundColor: colors.primary }]}
-            >
-              <Feather name="unlock" size={16} color="#fff" />
-              <Text style={[styles.unlockText, { fontFamily: "Inter_600SemiBold" }]}>Unlock</Text>
-            </Pressable>
-          </View>
-        )}
+          <Pressable
+            onPress={handleStop}
+            style={({ pressed }) => [
+              styles.stopBtn,
+              { backgroundColor: "#EF4444", opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Feather name="square" size={22} color="#fff" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -298,48 +269,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
     gap: 8,
   },
-  statusPill: {
+  pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  confidenceChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  confidenceText: { fontSize: 12 },
+  pillText: { fontSize: 13 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 13 },
-  metricsPanel: {
+  panel: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 18,
-    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
-    gap: 14,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  pausedBanner: {
+  pauseBanner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     borderRadius: 10,
     borderWidth: 1,
-    padding: 10,
+    paddingVertical: 8,
   },
-  pausedText: { fontSize: 14 },
+  pauseText: { fontSize: 13 },
   mainMetrics: {
     flexDirection: "row",
     alignItems: "center",
@@ -347,35 +316,18 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   bigMetric: { alignItems: "center", gap: 2 },
-  bigValue: { fontSize: 46, letterSpacing: -2 },
-  bigLabel: { fontSize: 11, letterSpacing: 2, textTransform: "uppercase" },
-  dividerV: { width: 1, height: 50 },
-  smallMetrics: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    flexWrap: "wrap",
-    gap: 4,
-  },
-  smallMetric: { alignItems: "center", gap: 2, minWidth: 50 },
-  smallValue: { fontSize: 20, letterSpacing: -0.5 },
-  smallLabel: { fontSize: 10 },
-  accuracyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  accuracyLabel: { fontSize: 11, width: 55 },
-  accuracyTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  accuracyFill: {
-    height: "100%",
-    borderRadius: 2,
-  },
-  accuracyPct: { fontSize: 12, width: 36, textAlign: "right" },
+  bigValue: { fontSize: 44, letterSpacing: -2 },
+  bigLabel: { fontSize: 11, letterSpacing: 2 },
+  divV: { width: 1, height: 48 },
+  secondaryRow: { flexDirection: "row", justifyContent: "space-around" },
+  secondaryStat: { alignItems: "center", gap: 1 },
+  secondaryVal: { fontSize: 19, letterSpacing: -0.5 },
+  secondaryUnit: { fontSize: 10 },
+  accuracyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  accLabel: { fontSize: 11, width: 55 },
+  accTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
+  accFill: { height: "100%", borderRadius: 2 },
+  accPct: { fontSize: 12, width: 36, textAlign: "right" },
   buttons: {
     flexDirection: "row",
     alignItems: "center",
@@ -383,41 +335,19 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingBottom: 4,
   },
-  iconBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   pauseBtn: {
     width: 72,
     height: 72,
     borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
   },
   stopBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
   },
-  lockedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 4,
-  },
-  lockedHint: { fontSize: 13, flex: 1 },
-  unlockBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  unlockText: { color: "#fff", fontSize: 14 },
 });
