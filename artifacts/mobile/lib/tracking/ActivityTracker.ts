@@ -95,6 +95,7 @@ export class ActivityTracker {
   private weightKg: number;
   private isSimulating = false;
   private gpsStatus: TrackingUpdate["gpsStatus"] = "acquiring";
+  private gpsLockTime: number | null = null; // set when GPS warmup completes — timer counts from here
 
   // Simulation state
   private simLat = 28.6139;
@@ -118,8 +119,9 @@ export class ActivityTracker {
     this.smoothedSpeedKmh = 0;
     this.gpsEngine.reset();
     this.gpsStatus = "acquiring";
+    this.gpsLockTime = null; // reset — timer won't count until GPS locks
 
-    // Timer starts FIRST — never blocked by permissions or sensor init
+    // Timer starts FIRST — ticks every second but elapsed stays 0 until GPS locks
     this.timerInterval = setInterval(() => {
       if (!this.isPaused) this._emitUpdate();
     }, 1000);
