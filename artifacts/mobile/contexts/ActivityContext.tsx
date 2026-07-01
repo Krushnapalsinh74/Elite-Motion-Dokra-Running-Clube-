@@ -49,7 +49,7 @@ export interface LiveMetrics {
 interface ActivityContextType {
   liveMetrics: LiveMetrics | null;
   savedActivities: Activity[];
-  startActivity: (type: ActivityType) => Promise<void>;
+  startActivity: (type: ActivityType) => void;
   pauseActivity: () => void;
   resumeActivity: () => void;
   stopActivity: () => Activity | null;
@@ -79,10 +79,28 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }
 
-  async function startActivity(type: ActivityType) {
+  function startActivity(type: ActivityType) {
     try { trackerRef.current?.stop(); } catch {}
     typeRef.current = type;
     isPausedRef.current = false;
+
+    // Set metrics immediately so the tracking screen shows right away
+    setLiveMetrics({
+      type,
+      distanceM: 0,
+      currentSpeedKmh: 0,
+      avgSpeedKmh: 0,
+      avgPaceMinPerKm: 0,
+      calories: 0,
+      steps: 0,
+      cadence: 0,
+      confidence: 0,
+      isMoving: false,
+      isPaused: false,
+      elapsedSeconds: 0,
+      gpsStatus: "acquiring",
+      coords: [],
+    });
 
     const tracker = new ActivityTracker(type, (update: TrackingUpdate) => {
       setLiveMetrics({
@@ -111,24 +129,8 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
     trackerRef.current = tracker;
 
-    setLiveMetrics({
-      type,
-      distanceM: 0,
-      currentSpeedKmh: 0,
-      avgSpeedKmh: 0,
-      avgPaceMinPerKm: 0,
-      calories: 0,
-      steps: 0,
-      cadence: 0,
-      confidence: 0,
-      isMoving: false,
-      isPaused: false,
-      elapsedSeconds: 0,
-      gpsStatus: "acquiring",
-      coords: [],
-    });
-
-    await tracker.start();
+    // Start in background — permission dialogs appear over the tracking screen
+    tracker.start().catch(() => {});
   }
 
   function pauseActivity() {

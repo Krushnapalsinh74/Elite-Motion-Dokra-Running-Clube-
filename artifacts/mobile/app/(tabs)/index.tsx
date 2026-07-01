@@ -51,8 +51,8 @@ export default function HomeScreen() {
   const recent = savedActivities.slice(0, 5);
   const firstName = user?.name?.split(" ")[0] ?? "Runner";
 
-  async function handleStart(type: "walking" | "running" | "cycling") {
-    await startActivity(type);
+  function handleStart(type: "walking" | "running" | "cycling") {
+    startActivity(type);
     router.push("/tracking");
   }
 
