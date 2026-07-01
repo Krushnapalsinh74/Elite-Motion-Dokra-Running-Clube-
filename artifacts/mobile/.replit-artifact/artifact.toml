@@ -10,10 +10,9 @@ name = "expo"
 version = "1.0.0"
 
 [[services]]
-ensurePreviewReachable = "/status"
 name = "expo"
 paths = [ "/" ]
-localPort = 18115
+localPort = 5000
 
 [services.development]
 run = "pnpm --filter @workspace/mobile run dev"
@@ -23,5 +22,5 @@ build = [ "pnpm", "--filter", "@workspace/mobile", "run", "build" ]
 run = [ "pnpm", "--filter", "@workspace/mobile", "run", "serve" ]
 
 [services.env]
-PORT = "18115"
+PORT = "5000"
 BASE_PATH = "/"

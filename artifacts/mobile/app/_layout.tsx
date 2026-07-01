@@ -8,12 +8,12 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import KeyboardProviderCompat from "@/components/KeyboardProviderCompat";
 import { ActivityProvider } from "@/contexts/ActivityContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -50,24 +50,33 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  // Fallback: if fonts haven't resolved after 3s (e.g. network restriction), proceed anyway
+  const [fontTimeout, setFontTimeout] = useState(false);
   useEffect(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
+    const t = setTimeout(() => setFontTimeout(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+  const ready = fontsLoaded || !!fontError || fontTimeout;
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
+            <KeyboardProviderCompat>
               <AuthProvider>
                 <ActivityProvider>
                   <RootLayoutNav />
                 </ActivityProvider>
               </AuthProvider>
-            </KeyboardProvider>
+            </KeyboardProviderCompat>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
