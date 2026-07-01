@@ -1,12 +1,12 @@
 /**
  * SensorFusion — motion detection + accurate step counting.
  *
- * Step counting strategy (in priority order):
- *  1. Hardware pedometer chip (expo-sensors Pedometer) — most accurate, uses dedicated silicon
- *  2. Accelerometer peak detection — works indoors/small rooms, no GPS needed
+ * Step counting strategy (priority order):
+ *  1. Hardware pedometer chip (expo-sensors Pedometer) — uses dedicated silicon
+ *  2. Accelerometer peak detection with adaptive gravity — works indoors, pocket, any orientation
  *
- * The accelerometer peak detector finds footstep signatures in the
- * acceleration magnitude signal using adaptive thresholding.
+ * The accelerometer detector uses an adaptive gravity estimate (slow EMA)
+ * so it correctly measures step impacts regardless of phone tilt/orientation.
  */
 
 import { PermissionsAndroid, Platform } from "react-native";
@@ -20,16 +20,18 @@ export interface MotionState {
   pedometerActive: boolean;
 }
 
-// Motion detection thresholds
+// Motion detection
 const STILL_THRESHOLD = 0.18;
 const MOVING_THRESHOLD = 0.5;
 const HISTORY_SIZE = 8;
 
-// Step detection constants
-const MIN_STEP_MS = 220;   // fastest realistic step: ~4.5 steps/sec
-const MAX_STEP_MS = 2500;  // slowest: ~0.4 steps/sec (very slow shuffle)
-const PEAK_THRESHOLD_BASE = 1.2;   // base g threshold to detect a step peak
-const PEAK_RESET_RATIO = 0.55;     // valley must drop to this fraction of threshold before next peak
+// Step detection timing bounds
+const MIN_STEP_MS = 220;   // fastest realistic: ~4.5 steps/sec
+const MAX_STEP_MS = 2500;  // slowest realistic: ~0.4 steps/sec
+
+// Step detection magnitude thresholds (in g above adaptive gravity)
+const STEP_PEAK_THRESHOLD = 0.7;    // must exceed this to start a peak
+const STEP_VALLEY_THRESHOLD = 0.15; // must drop below this to arm next peak
 
 export class SensorFusion {
   private accelListener: { remove: () => void } | null = null;
@@ -45,20 +47,19 @@ export class SensorFusion {
   };
   private onUpdate: (state: MotionState) => void;
 
-  // Hardware pedometer state
+  // Hardware pedometer
   private baselineSteps: number | null = null;
   private hwSteps = 0;
   private hwActive = false;
 
-  // Accelerometer step detector state
+  // Accelerometer step detector
   private accelSteps = 0;
-  private lastPeakMs = 0;
-  private inPeak = false;
-  private smoothedMag = 9.81;
-  private recentStepIntervals: number[] = [];
-  private lastAccelMs = 0;
-  private lastSpmUpdateMs = 0;
   private accelSpm = 0;
+  private gravityEst = 9.81;  // adaptive — tracks actual gravity regardless of orientation
+  private inPeak = false;
+  private lastPeakMs = 0;
+  private recentIntervals: number[] = [];
+  private lastSampleMs = 0;
 
   constructor(onUpdate: (state: MotionState) => void) {
     this.onUpdate = onUpdate;
@@ -70,7 +71,6 @@ export class SensorFusion {
       return;
     }
 
-    // Start both in parallel — either can fail without blocking the other
     await Promise.all([
       this._startAccelerometer(activityType).catch(() => {}),
       activityType !== "cycling" ? this._startPedometer().catch(() => {}) : Promise.resolve(),
@@ -78,33 +78,33 @@ export class SensorFusion {
   }
 
   private async _startAccelerometer(activityType: "walking" | "running" | "cycling") {
-    const SensorsModule = await import("expo-sensors");
-    const { Accelerometer } = SensorsModule;
-
-    Accelerometer.setUpdateInterval(100); // 10 Hz for good step resolution
+    const { Accelerometer } = await import("expo-sensors");
+    Accelerometer.setUpdateInterval(50); // 20 Hz — good resolution for steps
 
     this.accelListener = Accelerometer.addListener(({ x, y, z }) => {
       const now = Date.now();
-      if (now - this.lastAccelMs < 80) return; // ~12 Hz max
-      this.lastAccelMs = now;
+      if (now - this.lastSampleMs < 45) return;
+      this.lastSampleMs = now;
 
       const rawMag = Math.sqrt(x * x + y * y + z * z);
 
-      // Low-pass filter to separate gravity from dynamic acceleration
-      const alpha = 0.85;
-      this.smoothedMag = alpha * this.smoothedMag + (1 - alpha) * rawMag;
-      const dynamic = Math.abs(rawMag - this.smoothedMag);
+      // ── Adaptive gravity (very slow EMA, alpha=0.97) ──────────────────
+      // Tracks actual gravity contribution regardless of phone orientation.
+      // Dynamic impacts (steps) are too fast to affect this estimate.
+      this.gravityEst = 0.97 * this.gravityEst + 0.03 * rawMag;
+      const dynamic = rawMag - this.gravityEst;
 
-      // Motion detection
-      this.magnitudeHistory.push(dynamic);
+      // ── Motion detection ──────────────────────────────────────────────
+      const absDynamic = Math.abs(dynamic);
+      this.magnitudeHistory.push(absDynamic);
       if (this.magnitudeHistory.length > HISTORY_SIZE) this.magnitudeHistory.shift();
       const avgDynamic = this.magnitudeHistory.reduce((a, b) => a + b, 0) / this.magnitudeHistory.length;
       const isMoving = avgDynamic > STILL_THRESHOLD;
       const conf = avgDynamic > MOVING_THRESHOLD ? 0.85 : avgDynamic > STILL_THRESHOLD ? 0.6 : 0.9;
 
-      // Accelerometer step detection — only for walking/running, not cycling
+      // ── Accelerometer step detection (walking/running only) ───────────
       if (activityType !== "cycling") {
-        this._detectStep(rawMag, now);
+        this._detectStep(dynamic, now);
       }
 
       this.emit({
@@ -112,61 +112,60 @@ export class SensorFusion {
         isMoving,
         magnitude: avgDynamic,
         confidence: conf,
-        // Use hardware steps if available, otherwise use accel-detected steps
         steps: this.hwActive ? this.hwSteps : this.accelSteps,
-        stepsPerMinute: this.accelSpm,
+        stepsPerMinute: this.hwActive ? this.motionState.stepsPerMinute : this.accelSpm,
         pedometerActive: this.hwActive,
       });
     });
   }
 
   /**
-   * Adaptive peak detection step counter.
+   * Adaptive-gravity step detector.
    *
-   * Algorithm:
-   *  - Track the raw magnitude of acceleration
-   *  - A step is detected when magnitude crosses a threshold going UP (peak)
-   *  - Must return below threshold * PEAK_RESET_RATIO before counting next step
-   *  - Step interval must be within human walking/running range
-   *  - Cadence (SPM) computed from rolling window of recent step intervals
+   * Uses `dynamic = rawMag - gravityEst` so the threshold is always measured
+   * relative to the actual resting baseline of the phone — works in any orientation.
+   *
+   * State machine:
+   *   VALLEY (inPeak=false): waiting for magnitude to rise above STEP_PEAK_THRESHOLD
+   *   PEAK   (inPeak=true):  waiting for magnitude to fall below STEP_VALLEY_THRESHOLD
+   *
+   * A step is counted on the VALLEY→PEAK transition when the timing is valid.
    */
-  private _detectStep(rawMag: number, now: number) {
-    const dynamic = rawMag - 9.81;
-    const threshold = PEAK_THRESHOLD_BASE;
-
-    if (!this.inPeak && dynamic > threshold) {
-      // Rising edge — potential step start
-      const dt = this.lastPeakMs > 0 ? now - this.lastPeakMs : 0;
-
-      if (this.lastPeakMs === 0) {
-        // First step — just record timing
-        this.lastPeakMs = now;
+  private _detectStep(dynamic: number, now: number) {
+    if (!this.inPeak) {
+      // ── Valley state: look for rising edge ────────────────────────────
+      if (dynamic > STEP_PEAK_THRESHOLD) {
         this.inPeak = true;
-        return;
+
+        if (this.lastPeakMs === 0) {
+          // Very first peak — just initialise timing, don't count
+          this.lastPeakMs = now;
+          return;
+        }
+
+        const dt = now - this.lastPeakMs;
+
+        if (dt >= MIN_STEP_MS && dt <= MAX_STEP_MS) {
+          // ✓ Valid step
+          this.accelSteps++;
+          this.recentIntervals.push(dt);
+          if (this.recentIntervals.length > 8) this.recentIntervals.shift();
+          const avgInterval = this.recentIntervals.reduce((a, b) => a + b, 0) / this.recentIntervals.length;
+          this.accelSpm = Math.round(60000 / avgInterval);
+          this.lastPeakMs = now;
+        } else if (dt > MAX_STEP_MS) {
+          // Long pause — reset cadence, accept as new start
+          this.lastPeakMs = now;
+          this.recentIntervals = [];
+          this.accelSpm = 0;
+        }
+        // dt < MIN_STEP_MS → noise, ignore (don't update lastPeakMs)
       }
-
-      if (dt >= MIN_STEP_MS && dt <= MAX_STEP_MS) {
-        // Valid step interval — count it
-        this.accelSteps++;
-        this.recentStepIntervals.push(dt);
-        if (this.recentStepIntervals.length > 8) this.recentStepIntervals.shift();
-
-        // Update SPM from rolling average of recent intervals
-        const avgInterval = this.recentStepIntervals.reduce((a, b) => a + b, 0) / this.recentStepIntervals.length;
-        this.accelSpm = Math.round(60000 / avgInterval);
-      } else if (dt > MAX_STEP_MS) {
-        // Too long since last step — could be restarting after pause
-        // Accept it but don't count interval in SPM
-        this.accelSteps++;
-        this.recentStepIntervals = []; // reset cadence history
-        this.accelSpm = 0;
+    } else {
+      // ── Peak state: wait for valley before arming next peak ───────────
+      if (dynamic < STEP_VALLEY_THRESHOLD) {
+        this.inPeak = false;
       }
-
-      this.lastPeakMs = now;
-      this.inPeak = true;
-    } else if (this.inPeak && dynamic < threshold * PEAK_RESET_RATIO) {
-      // Fell below reset threshold — ready for next peak
-      this.inPeak = false;
     }
   }
 
@@ -183,12 +182,10 @@ export class SensorFusion {
           }
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
-      } catch { /* permission API not available, try anyway */ }
+      } catch {}
     }
 
-    const SensorsModule = await import("expo-sensors");
-    const { Pedometer } = SensorsModule;
-
+    const { Pedometer } = await import("expo-sensors");
     let available = false;
     try { available = await Pedometer.isAvailableAsync(); } catch {}
     if (!available) return;
@@ -200,18 +197,27 @@ export class SensorFusion {
       const total = result.steps;
 
       if (this.baselineSteps === null) {
-        // First reading — set baseline so we count from 0
         this.baselineSteps = total;
         this.hwActive = true;
         this.emit({ ...this.motionState, pedometerActive: true });
         return;
       }
 
-      this.hwSteps = Math.max(0, total - this.baselineSteps);
+      const newHwSteps = Math.max(0, total - this.baselineSteps);
+      const stepDelta = newHwSteps - this.hwSteps;
+      this.hwSteps = newHwSteps;
+
+      // Update cadence from hardware step deltas
+      let spm = this.motionState.stepsPerMinute;
+      if (stepDelta > 0) {
+        const instantSpm = stepDelta * 60; // rough estimate if called ~1/sec
+        spm = Math.round(spm * 0.6 + instantSpm * 0.4);
+      }
 
       this.emit({
         ...this.motionState,
         steps: this.hwSteps,
+        stepsPerMinute: spm,
         pedometerActive: true,
       });
     });
@@ -228,8 +234,8 @@ export class SensorFusion {
     this.accelListener = null;
     this.pedometerSub = null;
     this.magnitudeHistory = [];
+    this.recentIntervals = [];
     this.baselineSteps = null;
-    this.recentStepIntervals = [];
   }
 
   getState(): MotionState {
