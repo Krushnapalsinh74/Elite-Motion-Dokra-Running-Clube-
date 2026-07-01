@@ -42,9 +42,13 @@ function gpsColor(status: string, conf: number): string {
   return "#EF4444";
 }
 
-function gpsLabel(status: string, conf: number, elapsed: number): string {
+function gpsLabel(status: string, conf: number, elapsed: number, distM: number): string {
   if (status === "simulated") return "No GPS";
-  if (elapsed < 5 || status === "acquiring") return "Acquiring GPS...";
+  // During warmup: GPS is acquiring but distance is held at 0 intentionally
+  if (distM === 0 && elapsed < 30 && (status === "acquiring" || status === "poor")) {
+    return "Waiting for GPS lock…";
+  }
+  if (status === "acquiring") return "Acquiring GPS…";
   if (status === "locked") return `GPS ${Math.round(conf * 100)}%`;
   if (status === "poor") return "Weak GPS";
   return `GPS ${Math.round(conf * 100)}%`;
@@ -107,7 +111,7 @@ export default function TrackingScreen() {
   const isSimulated = gpsStatus === "simulated";
 
   const dotColor = gpsColor(gpsStatus, confidence);
-  const statusLabel = gpsLabel(gpsStatus, confidence, elapsed);
+  const statusLabel = gpsLabel(gpsStatus, confidence, elapsed, liveMetrics?.distanceM ?? 0);
 
   // Get real current location to center the map on mount
   useEffect(() => {
