@@ -119,22 +119,16 @@ export class ActivityTracker {
     this.gpsEngine.reset();
     this.gpsStatus = "acquiring";
 
-    // Sensors are optional — never let them block GPS from starting
-    try {
-      await this.sensorFusion.start(this.activityType);
-    } catch { /* sensor failure is non-fatal */ }
-
-    // Timer updates every second regardless of GPS or sensor state
+    // Timer starts FIRST — never blocked by permissions or sensor init
     this.timerInterval = setInterval(() => {
       if (!this.isPaused) this._emitUpdate();
     }, 1000);
 
-    // GPS always starts — this is the critical path
-    try {
-      await this._startGps();
-    } catch {
-      this._startSimulation();
-    }
+    // Sensors and GPS start in parallel — neither blocks the other
+    await Promise.all([
+      this.sensorFusion.start(this.activityType).catch(() => {}),
+      this._startGps().catch(() => { this._startSimulation(); }),
+    ]);
   }
 
   /**

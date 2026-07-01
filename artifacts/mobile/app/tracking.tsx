@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -84,6 +85,7 @@ export default function TrackingScreen() {
   const isWeb = Platform.OS === "web";
   const [enablingGps, setEnablingGps] = useState(false);
   const [gpsDenied, setGpsDenied] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const coords = liveMetrics?.coords ?? [];
   const lastCoord = coords.length > 0 ? coords[coords.length - 1] : null;
@@ -92,7 +94,8 @@ export default function TrackingScreen() {
   const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
   const speedKmh = liveMetrics?.currentSpeedKmh ?? 0;
   const speed = speedKmh.toFixed(1);
-  const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
+  // Only show pace when actually moving — avg pace is misleading when stationary
+  const pace = speedKmh >= 0.5 ? fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0) : "--:--";
   const calories = liveMetrics?.calories ?? 0;
   const steps = liveMetrics?.steps ?? 0;
   const cadence = liveMetrics?.cadence ?? 0;
@@ -106,6 +109,24 @@ export default function TrackingScreen() {
   const dotColor = gpsColor(gpsStatus, confidence);
   const statusLabel = gpsLabel(gpsStatus, confidence, elapsed);
 
+  // Get real current location to center the map on mount
+  useEffect(() => {
+    if (isWeb) return;
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      .then((loc) => {
+        const region = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        };
+        setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        try { mapRef.current?.animateToRegion(region, 300); } catch {}
+      })
+      .catch(() => {});
+  }, [isWeb]);
+
+  // Follow the user as GPS coords arrive
   useEffect(() => {
     if (lastCoord && mapRef.current && !isWeb) {
       try {
@@ -166,8 +187,8 @@ export default function TrackingScreen() {
   }
 
   const initialRegion = {
-    latitude: lastCoord?.latitude ?? 28.6139,
-    longitude: lastCoord?.longitude ?? 77.209,
+    latitude: lastCoord?.latitude ?? currentLocation?.latitude ?? 28.6139,
+    longitude: lastCoord?.longitude ?? currentLocation?.longitude ?? 77.209,
     latitudeDelta: 0.008,
     longitudeDelta: 0.008,
   };
