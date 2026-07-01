@@ -1,0 +1,3 @@
+- [Dokra tracking engine](dokra-tracking.md) — 3-layer GPS accuracy: Kalman filter → GpsAccuracyEngine → SensorFusion, all wired by ActivityTracker
+- [Dokra platform map split](dokra-map-split.md) — TrackingMap.tsx (native) + TrackingMap.web.tsx (stub) required to prevent native-only import crash on web
+- [Dokra context API](dokra-context-api.md) — ActivityContext exposes `liveMetrics` (not `liveActivity`); Activity shape has `steps`, `confidence` fields added in v2

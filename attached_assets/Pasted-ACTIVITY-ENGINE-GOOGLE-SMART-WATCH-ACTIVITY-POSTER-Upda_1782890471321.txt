@@ -1,0 +1,599 @@
+ACTIVITY ENGINE + GOOGLE + SMART WATCH + ACTIVITY POSTER
+
+Update the existing Flutter Sports Tracking Application.
+
+Do NOT redesign existing screens.
+
+Do NOT remove existing functionality.
+
+Upgrade the application into a complete production-grade sports tracking platform.
+
+The highest priority is:
+
+Accurate Activity Tracking
+Google Integration
+Live GPS
+Smart Watch Sync
+Activity Poster Generator
+
+Everything must work together.
+
+AUTHENTICATION
+
+Replace current authentication with production-ready authentication.
+
+Support:
+
+• Google Login (Official OAuth)
+
+• Email Login
+
+• Register
+
+• Forgot Password
+
+• Email Verification
+
+• Secure Session
+
+• Auto Login
+
+• Logout
+
+Store:
+
+User ID
+
+Name
+
+Email
+
+Profile Photo
+
+Last Login
+
+Created Date
+
+GOOGLE INTEGRATION
+
+Integrate official Google APIs.
+
+Use:
+
+Google Maps SDK
+
+Google Location Services
+
+Google Places API
+
+Google Directions API
+
+Health Connect
+
+Google Sign-In
+
+Everything must use official Google SDKs.
+
+No fake implementation.
+
+LIVE MAP TRACKING
+
+When activity starts:
+
+Open full-screen live map.
+
+Map must:
+
+Show user's current location.
+
+Follow user automatically.
+
+Rotate according to movement.
+
+Zoom intelligently.
+
+Display live accuracy circle.
+
+Show GPS strength.
+
+Allow manual zoom.
+
+Provide "Center Me" button.
+
+LIVE ROUTE DRAWING
+
+As the user moves:
+
+Draw the travelled path continuously.
+
+Requirements:
+
+Start Point
+
+Green Marker
+
+Current Position
+
+Moving Marker
+
+Finish Point
+
+Red Marker
+
+Route:
+
+Draw RED Polyline.
+
+Update instantly.
+
+Do not redraw the whole line.
+
+Append only new points.
+
+Smooth curves.
+
+Filter GPS noise.
+
+After activity finishes:
+
+Keep entire route visible.
+
+Allow zoom.
+
+Allow replay.
+
+GPS ACCURACY ENGINE (MOST IMPORTANT)
+
+Distance must only increase when genuine movement is detected.
+
+Never count:
+
+GPS drift
+
+Phone shaking
+
+Standing in one place
+
+Poor GPS jumps
+
+Incorrect satellite readings
+
+Signal bounce
+
+Implement:
+
+Kalman Filter
+
+Movement Threshold
+
+Minimum Accuracy Check
+
+Maximum Speed Validation
+
+Outlier Detection
+
+GPS Confidence Score
+
+Distance Smoothing
+
+Sensor Fusion
+
+Store:
+
+Raw GPS Points
+
+Filtered GPS Points
+
+Final Distance
+
+WALKING MODE
+
+Walking should use:
+
+GPS
+
+Accelerometer
+
+Step Counter
+
+Gyroscope
+
+Health Connect
+
+Watch Data
+
+Show:
+
+Steps
+
+Distance
+
+Time
+
+Calories
+
+Average Pace
+
+Current Pace
+
+Walking Speed
+
+Count steps ONLY while actually walking.
+
+Ignore:
+
+Hand movement
+
+Phone movement
+
+Vehicle movement
+
+RUNNING MODE
+
+Running should calculate:
+
+Distance
+
+Running Speed
+
+Average Speed
+
+Current Speed
+
+Average Pace
+
+Split Pace
+
+Calories
+
+Heart Rate
+
+Cadence
+
+Stride Length
+
+Detect:
+
+Walking
+
+Running
+
+Standing
+
+Auto Pause
+
+Auto Resume
+
+CYCLING MODE
+
+Cycling should calculate:
+
+Distance
+
+Current Speed
+
+Average Speed
+
+Top Speed
+
+Elevation
+
+Calories
+
+Ride Duration
+
+Heart Rate
+
+Cadence (if available)
+
+Detect:
+
+Traffic Stops
+
+Pause
+
+Resume
+
+SMART WATCH CONNECTIVITY
+
+Support:
+
+Wear OS
+
+Samsung Galaxy Watch
+
+Pixel Watch
+
+Apple Watch
+
+Health Connect
+
+HealthKit
+
+Capabilities:
+
+Start Activity
+
+Pause Activity
+
+Resume Activity
+
+Stop Activity
+
+Sync Heart Rate
+
+Sync Calories
+
+Sync Steps
+
+Sync Distance
+
+Sync Time
+
+Sync Cadence
+
+Sync in Background
+
+Offline Sync
+
+Auto Reconnect
+
+If phone stays in pocket or bag,
+
+watch must continue collecting data and sync automatically.
+
+BACKGROUND TRACKING
+
+Tracking must NEVER stop when:
+
+Phone Locked
+
+Screen Off
+
+Incoming Call
+
+App Minimized
+
+Notification Opened
+
+Another App Opened
+
+Temporary Internet Loss
+
+Requirements:
+
+Continue Timer
+
+Continue GPS
+
+Continue Route
+
+Continue Step Counting
+
+Continue Watch Sync
+
+Recover automatically.
+
+ACTIVITY SUMMARY
+
+After Finish:
+
+Generate professional report.
+
+Show:
+
+Activity Type
+
+Distance
+
+Duration
+
+Average Pace
+
+Average Speed
+
+Calories
+
+Steps
+
+Heart Rate
+
+Weather
+
+Temperature
+
+Elevation
+
+Map Route
+
+GPS Accuracy
+
+Start Time
+
+Finish Time
+
+ACTIVITY POSTER STUDIO
+
+After activity is saved:
+
+Open Activity Poster Studio.
+
+User can:
+
+Upload Profile Photo
+
+Upload Custom Photo
+
+Choose Background
+
+Choose Theme
+
+Choose Layout
+
+Change Colors
+
+Change Fonts
+
+Move Elements
+
+Generate Poster
+
+Poster must include:
+
+Large User Photo
+
+Activity Name
+
+Walking / Running / Cycling
+
+Distance
+
+Duration
+
+Average Pace
+
+Calories
+
+Steps
+
+Heart Rate
+
+Weather
+
+Location
+
+Date
+
+Time
+
+Live Route Map
+
+Brand Logo
+
+QR Code (optional)
+
+Poster should look like premium sports advertising artwork similar to the style shown in the reference image, but with an original layout and branding.
+
+Allow exporting in:
+
+Instagram Story
+
+Instagram Post
+
+Facebook
+
+WhatsApp
+
+Square
+
+Portrait
+
+Landscape
+
+4K Resolution
+
+Buttons:
+
+Preview
+
+Download
+
+Share
+
+Regenerate
+
+ADMIN PANEL
+
+Admin should see:
+
+Users
+
+Activities
+
+Routes
+
+Watch Connections
+
+GPS Logs
+
+Photo Gallery
+
+Analytics
+
+Reports
+
+Google API Status
+
+Push Notifications
+
+App Settings
+
+User Details
+
+Activity Details
+
+Delete Activity
+
+Export Reports
+
+CSV
+
+Excel
+
+PDF
+
+DATABASE
+
+Save:
+
+User
+
+Activity
+
+GPS Route
+
+Raw Coordinates
+
+Filtered Coordinates
+
+Weather
+
+Heart Rate
+
+Steps
+
+Calories
+
+Poster Image
+
+Profile
+
+Watch Sync
+
+Analytics
+
+Crash Logs
+
+PERFORMANCE
+
+Cold Start under 2 seconds
+
+Live Tracking Delay under 1 second
+
+Battery Optimized
+
+Offline Mode
+
+Auto Sync
+
+Crash Recovery
+
+Smooth Animations
+
+Production Ready
+
+FINAL REQUIREMENT
+
+The application must feel like a premium fitness product.
+
+Tracking must be highly accurate using official Google services, device sensors, and wearable data where available. Route drawing should update live on the map, showing the user's travelled path as a continuous red line. Activity summaries and poster generation should use real workout data. The poster editor should let users upload their own photo and generate a high-quality, shareable sports poster inspired by modern fitness apps while keeping the branding and layout original.

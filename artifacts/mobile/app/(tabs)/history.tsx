@@ -14,23 +14,17 @@ import { HistoryCard } from "@/components/HistoryCard";
 import { Activity, useActivity } from "@/contexts/ActivityContext";
 import { useColors } from "@/hooks/useColors";
 
-type Filter = "week" | "month" | "year" | "all";
+type TimeFilter = "week" | "month" | "year" | "all";
 type TypeFilter = "all" | "walking" | "running" | "cycling";
 
-function filterByTime(activities: Activity[], filter: Filter): Activity[] {
+function filterByTime(activities: Activity[], filter: TimeFilter): Activity[] {
   const now = new Date();
   return activities.filter((a) => {
     const d = new Date(a.startTime);
-    if (filter === "week") {
-      const weekAgo = new Date(now.getTime() - 7 * 86400000);
-      return d >= weekAgo;
-    }
-    if (filter === "month") {
+    if (filter === "week") return d >= new Date(now.getTime() - 7 * 86400000);
+    if (filter === "month")
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }
-    if (filter === "year") {
-      return d.getFullYear() === now.getFullYear();
-    }
+    if (filter === "year") return d.getFullYear() === now.getFullYear();
     return true;
   });
 }
@@ -39,7 +33,7 @@ export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { savedActivities, deleteActivity } = useActivity();
-  const [timeFilter, setTimeFilter] = useState<Filter>("week");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("week");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const isWeb = Platform.OS === "web";
   const paddingTop = isWeb ? insets.top + 67 : insets.top + 16;
@@ -53,15 +47,16 @@ export default function HistoryScreen() {
   const totalDistance = filtered.reduce((s, a) => s + a.distance, 0);
   const totalTime = filtered.reduce((s, a) => s + a.duration, 0);
   const totalCalories = filtered.reduce((s, a) => s + a.calories, 0);
+  const totalSteps = filtered.reduce((s, a) => s + (a.steps ?? 0), 0);
 
-  const TIME_FILTERS: { key: Filter; label: string }[] = [
+  const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
     { key: "week", label: "Week" },
     { key: "month", label: "Month" },
     { key: "year", label: "Year" },
     { key: "all", label: "All" },
   ];
 
-  const TYPE_FILTERS: { key: TypeFilter; icon: "wind" | "zap" | "activity" | "grid" }[] = [
+  const TYPE_FILTERS: { key: TypeFilter; icon: "grid" | "wind" | "zap" | "activity" }[] = [
     { key: "all", icon: "grid" },
     { key: "walking", icon: "wind" },
     { key: "running", icon: "zap" },
@@ -74,10 +69,9 @@ export default function HistoryScreen() {
         contentContainerStyle={{ paddingTop, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header + time filters */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            History
-          </Text>
+          <Text style={[styles.title, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>History</Text>
           <View style={styles.filters}>
             {TIME_FILTERS.map((f) => (
               <Pressable
@@ -107,34 +101,23 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        <View style={[styles.statsRow, { paddingHorizontal: 24 }]}>
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-              {(totalDistance / 1000).toFixed(1)}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-              km
-            </Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-              {Math.floor(totalTime / 60)}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-              min
-            </Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-              {totalCalories}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-              kcal
-            </Text>
-          </View>
+        {/* Summary stats */}
+        <View style={styles.statsRow}>
+          {[
+            { val: (totalDistance / 1000).toFixed(1), label: "km" },
+            { val: String(Math.floor(totalTime / 60)), label: "min" },
+            { val: String(totalCalories), label: "kcal" },
+            { val: String(totalSteps > 0 ? totalSteps : filtered.length), label: totalSteps > 0 ? "steps" : "sessions" },
+          ].map((s) => (
+            <View key={s.label} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.statVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>{s.val}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>{s.label}</Text>
+            </View>
+          ))}
         </View>
 
-        <View style={[styles.typeRow, { paddingHorizontal: 24 }]}>
+        {/* Type filters */}
+        <View style={styles.typeRow}>
           {TYPE_FILTERS.map((f) => (
             <Pressable
               key={f.key}
@@ -156,6 +139,7 @@ export default function HistoryScreen() {
           ))}
         </View>
 
+        {/* Activity list */}
         <View style={{ paddingHorizontal: 24, marginTop: 8 }}>
           {filtered.length === 0 ? (
             <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -165,9 +149,7 @@ export default function HistoryScreen() {
               </Text>
             </View>
           ) : (
-            filtered.map((a) => (
-              <HistoryCard key={a.id} activity={a} onPress={() => {}} />
-            ))
+            filtered.map((a) => <HistoryCard key={a.id} activity={a} />)
           )}
         </View>
       </ScrollView>
@@ -180,39 +162,14 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 24, marginBottom: 20, gap: 16 },
   title: { fontSize: 28 },
   filters: { flexDirection: "row", gap: 8 },
-  filterBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
+  filterBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   filterText: { fontSize: 13 },
-  statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  statCard: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    alignItems: "center",
-    gap: 2,
-  },
-  statVal: { fontSize: 22 },
-  statLabel: { fontSize: 11 },
-  typeRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  typeBtn: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  empty: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 28,
-    alignItems: "center",
-    gap: 10,
-  },
+  statsRow: { flexDirection: "row", paddingHorizontal: 24, gap: 8, marginBottom: 16 },
+  statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: "center", gap: 2 },
+  statVal: { fontSize: 18 },
+  statLabel: { fontSize: 10 },
+  typeRow: { flexDirection: "row", paddingHorizontal: 24, gap: 10, marginBottom: 16 },
+  typeBtn: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: "center", justifyContent: "center" },
+  empty: { borderRadius: 16, borderWidth: 1, padding: 28, alignItems: "center", gap: 10 },
   emptyText: { fontSize: 14, textAlign: "center" },
 });

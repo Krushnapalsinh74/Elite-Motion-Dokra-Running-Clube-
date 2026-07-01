@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useMemo } from "react";
 import {
@@ -33,32 +32,21 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
 
-  const todayDistanceM = useMemo(() => {
+  const todayActivities = useMemo(() => {
     const today = new Date().toDateString();
-    return savedActivities
-      .filter((a) => new Date(a.startTime).toDateString() === today)
-      .reduce((sum, a) => sum + a.distance, 0);
+    return savedActivities.filter((a) => new Date(a.startTime).toDateString() === today);
   }, [savedActivities]);
 
+  const todayDistanceM = todayActivities.reduce((s, a) => s + a.distance, 0);
   const todayDistanceKm = todayDistanceM / 1000;
   const goalKm = 5;
   const progress = Math.min(todayDistanceKm / goalKm, 1);
 
-  const todayCalories = useMemo(() => {
-    const today = new Date().toDateString();
-    return savedActivities
-      .filter((a) => new Date(a.startTime).toDateString() === today)
-      .reduce((sum, a) => sum + a.calories, 0);
-  }, [savedActivities]);
-
-  const todayTime = useMemo(() => {
-    const today = new Date().toDateString();
-    const secs = savedActivities
-      .filter((a) => new Date(a.startTime).toDateString() === today)
-      .reduce((sum, a) => sum + a.duration, 0);
-    const m = Math.floor(secs / 60);
-    return `${m}m`;
-  }, [savedActivities]);
+  const todayCalories = todayActivities.reduce((s, a) => s + a.calories, 0);
+  const todayTime = todayActivities.reduce((s, a) => s + a.duration, 0);
+  const todayTimeFmt = todayTime >= 3600
+    ? `${Math.floor(todayTime / 3600)}h ${Math.floor((todayTime % 3600) / 60)}m`
+    : `${Math.floor(todayTime / 60)}m`;
 
   const recent = savedActivities.slice(0, 5);
   const firstName = user?.name?.split(" ")[0] ?? "Runner";
@@ -76,6 +64,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop, paddingBottom: 100 }}
       >
+        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
@@ -95,6 +84,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        {/* Stat Ring + quick stats */}
         <View style={styles.ringSection}>
           <StatRing
             progress={progress}
@@ -105,36 +95,25 @@ export default function HomeScreen() {
             sublabel={`Goal: ${goalKm} km`}
           />
           <View style={styles.quickStats}>
-            <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="flame" size={16} color={colors.primary} />
-              <Text style={[styles.quickStatVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-                {todayCalories}
-              </Text>
-              <Text style={[styles.quickStatLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                kcal
-              </Text>
-            </View>
-            <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="clock" size={16} color={colors.primary} />
-              <Text style={[styles.quickStatVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-                {todayTime}
-              </Text>
-              <Text style={[styles.quickStatLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                active
-              </Text>
-            </View>
-            <View style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="activity" size={16} color={colors.primary} />
-              <Text style={[styles.quickStatVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-                {savedActivities.filter((a) => new Date(a.startTime).toDateString() === new Date().toDateString()).length}
-              </Text>
-              <Text style={[styles.quickStatLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                sessions
-              </Text>
-            </View>
+            {[
+              { icon: "zap" as const, val: todayCalories.toString(), label: "kcal" },
+              { icon: "clock" as const, val: todayTimeFmt, label: "active" },
+              { icon: "activity" as const, val: String(todayActivities.length), label: "sessions" },
+            ].map((s) => (
+              <View key={s.label} style={[styles.quickStat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name={s.icon} size={16} color={colors.primary} />
+                <Text style={[styles.quickStatVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+                  {s.val}
+                </Text>
+                <Text style={[styles.quickStatLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                  {s.label}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
+        {/* Quick start */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
             Start Activity
@@ -146,6 +125,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Recent activities */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
@@ -184,13 +164,7 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 14 },
   name: { fontSize: 26 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontSize: 18 },
   ringSection: { alignItems: "center", paddingHorizontal: 24, gap: 20, marginBottom: 8 },
   quickStats: { flexDirection: "row", gap: 10, width: "100%" },
@@ -209,12 +183,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18 },
   seeAll: { fontSize: 14 },
   activityRow: { flexDirection: "row", gap: 10 },
-  empty: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 28,
-    alignItems: "center",
-    gap: 10,
-  },
+  empty: { borderRadius: 16, borderWidth: 1, padding: 28, alignItems: "center", gap: 10 },
   emptyText: { fontSize: 14, textAlign: "center" },
 });

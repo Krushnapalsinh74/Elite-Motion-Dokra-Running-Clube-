@@ -19,33 +19,47 @@ import { useColors } from "@/hooks/useColors";
 
 const LABELS = { walking: "Walking", running: "Running", cycling: "Cycling" };
 
-function fmt(seconds: number): string {
+function fmtTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const s = Math.floor(seconds % 60);
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function fmtPace(minPerKm: number): string {
+  if (minPerKm <= 0 || !isFinite(minPerKm)) return "--:--";
+  const m = Math.floor(minPerKm);
+  const s = Math.round((minPerKm - m) * 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function confidenceColor(c: number): string {
+  if (c >= 0.8) return "#10B981"; // green
+  if (c >= 0.5) return "#F59E0B"; // amber
+  return "#EF4444"; // red
+}
+
 export default function TrackingScreen() {
-  const { liveActivity, pauseActivity, resumeActivity, stopActivity, saveActivity, elapsed } = useActivity();
+  const { liveMetrics, pauseActivity, resumeActivity, stopActivity, saveActivity } = useActivity();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const [locked, setLocked] = useState(false);
   const isWeb = Platform.OS === "web";
 
-  const coords = liveActivity?.coords ?? [];
+  const coords = liveMetrics?.coords ?? [];
   const lastCoord = coords.length > 0 ? coords[coords.length - 1] : null;
-  const distKm = liveActivity ? (liveActivity.distance / 1000).toFixed(2) : "0.00";
-  const speed = liveActivity ? liveActivity.currentSpeed.toFixed(1) : "0.0";
-  const pace =
-    liveActivity && liveActivity.currentSpeed > 0
-      ? `${Math.floor(60 / liveActivity.currentSpeed)}:${String(
-          Math.round(((60 / liveActivity.currentSpeed) % 1) * 60)
-        ).padStart(2, "0")}`
-      : "--:--";
-  const calories = liveActivity?.calories ?? 0;
+  const isPaused = liveMetrics?.isPaused ?? false;
+  const elapsed = liveMetrics?.elapsedSeconds ?? 0;
+  const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
+  const speedStr = (liveMetrics?.currentSpeedKmh ?? 0).toFixed(1);
+  const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
+  const calories = liveMetrics?.calories ?? 0;
+  const steps = liveMetrics?.steps ?? 0;
+  const cadence = liveMetrics?.cadence ?? 0;
+  const confidence = liveMetrics?.confidence ?? 0;
+  const isMoving = liveMetrics?.isMoving ?? false;
 
   useEffect(() => {
     if (lastCoord && mapRef.current && !isWeb) {
@@ -62,14 +76,14 @@ export default function TrackingScreen() {
   }, [lastCoord, isWeb]);
 
   useEffect(() => {
-    if (!liveActivity && router.canGoBack()) {
+    if (!liveMetrics && router.canGoBack()) {
       router.back();
     }
-  }, [liveActivity]);
+  }, [liveMetrics]);
 
   function handlePause() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (liveActivity?.isPaused) {
+    if (isPaused) {
       resumeActivity();
     } else {
       pauseActivity();
@@ -108,10 +122,9 @@ export default function TrackingScreen() {
   };
 
   const polylineCoords = coords.map((c) => ({ latitude: c.latitude, longitude: c.longitude }));
-  const isPaused = liveActivity?.isPaused ?? false;
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: "#0A0A0A" }]}>
       <TrackingMap
         mapRef={mapRef}
         initialRegion={mapInitialRegion}
@@ -120,29 +133,45 @@ export default function TrackingScreen() {
         primaryColor={colors.primary}
       />
 
+      {/* Top status bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (isWeb ? 67 : 12) }]}>
         <View style={[styles.statusPill, { backgroundColor: "#000000CC" }]}>
-          <View style={[styles.dot, { backgroundColor: isPaused ? "#F59E0B" : "#10B981" }]} />
+          <View style={[styles.dot, { backgroundColor: isPaused ? "#F59E0B" : isMoving ? "#10B981" : "#9E9E9E" }]} />
           <Text style={[styles.statusText, { color: "#fff", fontFamily: "Inter_500Medium" }]}>
-            {isPaused ? "Paused" : liveActivity ? LABELS[liveActivity.type] : "Tracking"}
+            {isPaused ? "Paused" : isMoving ? (liveMetrics ? LABELS[liveMetrics.type] : "Active") : "Waiting for GPS…"}
+          </Text>
+        </View>
+
+        {/* GPS Confidence chip */}
+        <View style={[styles.confidenceChip, { backgroundColor: "#000000CC" }]}>
+          <View style={[styles.dot, { backgroundColor: confidenceColor(confidence) }]} />
+          <Text style={[styles.confidenceText, { color: "#fff", fontFamily: "Inter_400Regular" }]}>
+            {Math.round(confidence * 100)}% GPS
           </Text>
         </View>
       </View>
 
+      {/* Bottom metrics panel */}
       <View
         style={[
           styles.metricsPanel,
-          { backgroundColor: "#000000E6", paddingBottom: insets.bottom + (isWeb ? 34 : 20) },
+          {
+            backgroundColor: "#000000EE",
+            paddingBottom: insets.bottom + (isWeb ? 34 : 20),
+            borderTopColor: "#2A2A2A",
+          },
         ]}
       >
         {isPaused && (
           <View style={[styles.pausedBanner, { backgroundColor: "#F59E0B22", borderColor: "#F59E0B55" }]}>
+            <Feather name="pause-circle" size={14} color="#F59E0B" />
             <Text style={[styles.pausedText, { color: "#F59E0B", fontFamily: "Inter_600SemiBold" }]}>
               Activity Paused
             </Text>
           </View>
         )}
 
+        {/* Primary metrics: distance + time */}
         <View style={styles.mainMetrics}>
           <View style={styles.bigMetric}>
             <Text style={[styles.bigValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
@@ -150,27 +179,62 @@ export default function TrackingScreen() {
           </View>
           <View style={[styles.dividerV, { backgroundColor: "#2A2A2A" }]} />
           <View style={styles.bigMetric}>
-            <Text style={[styles.bigValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{fmt(elapsed)}</Text>
+            <Text style={[styles.bigValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{fmtTime(elapsed)}</Text>
             <Text style={[styles.bigLabel, { color: "#9E9E9E", fontFamily: "Inter_500Medium" }]}>TIME</Text>
           </View>
         </View>
 
+        {/* Secondary metrics */}
         <View style={styles.smallMetrics}>
           <View style={styles.smallMetric}>
-            <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{speed}</Text>
+            <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{speedStr}</Text>
             <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>km/h</Text>
           </View>
           <View style={styles.smallMetric}>
             <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{pace}</Text>
-            <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>/km pace</Text>
+            <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>/km</Text>
           </View>
           <View style={styles.smallMetric}>
             <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{calories}</Text>
             <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>kcal</Text>
           </View>
+          {steps > 0 && (
+            <View style={styles.smallMetric}>
+              <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{steps}</Text>
+              <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>steps</Text>
+            </View>
+          )}
+          {cadence > 0 && (
+            <View style={styles.smallMetric}>
+              <Text style={[styles.smallValue, { color: "#fff", fontFamily: "Inter_700Bold" }]}>{cadence}</Text>
+              <Text style={[styles.smallLabel, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>spm</Text>
+            </View>
+          )}
         </View>
 
-        {!locked && (
+        {/* Accuracy bar */}
+        <View style={styles.accuracyRow}>
+          <Text style={[styles.accuracyLabel, { color: "#666", fontFamily: "Inter_400Regular" }]}>
+            Accuracy
+          </Text>
+          <View style={[styles.accuracyTrack, { backgroundColor: "#2A2A2A" }]}>
+            <View
+              style={[
+                styles.accuracyFill,
+                {
+                  width: `${Math.round(confidence * 100)}%` as `${number}%`,
+                  backgroundColor: confidenceColor(confidence),
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.accuracyPct, { color: confidenceColor(confidence), fontFamily: "Inter_600SemiBold" }]}>
+            {Math.round(confidence * 100)}%
+          </Text>
+        </View>
+
+        {/* Control buttons */}
+        {!locked ? (
           <View style={styles.buttons}>
             <Pressable
               onPress={() => setLocked(true)}
@@ -205,12 +269,10 @@ export default function TrackingScreen() {
               <Feather name="square" size={22} color="#fff" />
             </Pressable>
           </View>
-        )}
-
-        {locked && (
+        ) : (
           <View style={styles.lockedRow}>
             <Text style={[styles.lockedHint, { color: "#9E9E9E", fontFamily: "Inter_400Regular" }]}>
-              Screen locked
+              Screen locked — tap to unlock
             </Text>
             <Pressable
               onPress={() => setLocked(false)}
@@ -233,17 +295,29 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    alignSelf: "flex-start",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
   },
+  confidenceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  confidenceText: { fontSize: 12 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 13 },
   metricsPanel: {
@@ -251,15 +325,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 20,
+    paddingTop: 18,
     paddingHorizontal: 24,
-    gap: 16,
+    borderTopWidth: 1,
+    gap: 14,
   },
   pausedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     borderRadius: 10,
     borderWidth: 1,
     padding: 10,
-    alignItems: "center",
   },
   pausedText: { fontSize: 14 },
   mainMetrics: {
@@ -269,22 +347,41 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   bigMetric: { alignItems: "center", gap: 2 },
-  bigValue: { fontSize: 48, letterSpacing: -2 },
+  bigValue: { fontSize: 46, letterSpacing: -2 },
   bigLabel: { fontSize: 11, letterSpacing: 2, textTransform: "uppercase" },
   dividerV: { width: 1, height: 50 },
   smallMetrics: {
     flexDirection: "row",
     justifyContent: "space-around",
+    flexWrap: "wrap",
+    gap: 4,
   },
-  smallMetric: { alignItems: "center", gap: 2 },
-  smallValue: { fontSize: 22, letterSpacing: -0.5 },
-  smallLabel: { fontSize: 11 },
+  smallMetric: { alignItems: "center", gap: 2, minWidth: 50 },
+  smallValue: { fontSize: 20, letterSpacing: -0.5 },
+  smallLabel: { fontSize: 10 },
+  accuracyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  accuracyLabel: { fontSize: 11, width: 55 },
+  accuracyTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  accuracyFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  accuracyPct: { fontSize: 12, width: 36, textAlign: "right" },
   buttons: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 20,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   iconBtn: {
     width: 52,
@@ -311,9 +408,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
-  lockedHint: { fontSize: 14 },
+  lockedHint: { fontSize: 13, flex: 1 },
   unlockBtn: {
     flexDirection: "row",
     alignItems: "center",

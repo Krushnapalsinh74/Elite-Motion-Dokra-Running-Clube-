@@ -1,10 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +18,7 @@ const TIPS = [
   { icon: "thermometer" as const, text: "Warm up for 5 minutes before starting" },
   { icon: "droplet" as const, text: "Stay hydrated throughout your activity" },
   { icon: "shield" as const, text: "GPS locks within 30 seconds outdoors" },
+  { icon: "cpu" as const, text: "Kalman filtering removes GPS drift automatically" },
 ];
 
 export default function ActivityScreen() {
@@ -55,6 +54,18 @@ export default function ActivityScreen() {
           ))}
         </View>
 
+        <View style={styles.engineBadge}>
+          <View style={[styles.badge, { backgroundColor: colors.primary + "22", borderColor: colors.primary + "55" }]}>
+            <Feather name="cpu" size={14} color={colors.primary} />
+            <Text style={[styles.badgeText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+              High-Accuracy Engine Active
+            </Text>
+          </View>
+          <Text style={[styles.badgeSubtext, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+            Kalman filter · Sensor fusion · Motion detection · GPS smoothing
+          </Text>
+        </View>
+
         <View style={styles.tipsSection}>
           <Text style={[styles.tipsTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
             Quick tips
@@ -81,7 +92,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 28 },
   subtitle: { fontSize: 15 },
   cards: { paddingHorizontal: 24, gap: 12 },
-  tipsSection: { paddingHorizontal: 24, marginTop: 32, gap: 10 },
+  engineBadge: { paddingHorizontal: 24, marginTop: 20, gap: 8 },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  badgeText: { fontSize: 13 },
+  badgeSubtext: { fontSize: 12 },
+  tipsSection: { paddingHorizontal: 24, marginTop: 24, gap: 10 },
   tipsTitle: { fontSize: 16, marginBottom: 4 },
   tip: {
     flexDirection: "row",
@@ -91,12 +115,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  tipIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  tipIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   tipText: { flex: 1, fontSize: 13, lineHeight: 18 },
 });
