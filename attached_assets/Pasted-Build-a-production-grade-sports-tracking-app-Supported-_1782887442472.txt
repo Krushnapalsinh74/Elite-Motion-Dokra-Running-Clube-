@@ -1,0 +1,642 @@
+Build a production-grade sports tracking app.
+
+Supported activities ONLY:
+
+Walking
+Running
+Cycling
+
+The app must focus on extremely polished tracking experience, professional UI, accurate measurement, smartwatch sync, Google integration and premium usability.
+
+Every screen, button and action must have defined behavior.
+
+GLOBAL USER FLOW
+
+Open App
+
+↓
+
+Authentication
+
+↓
+
+Dashboard
+
+↓
+
+Select Activity
+
+↓
+
+Configure Session
+
+↓
+
+Start Tracking
+
+↓
+
+Live Tracking
+
+↓
+
+Pause / Resume
+
+↓
+
+Stop
+
+↓
+
+Summary
+
+↓
+
+Generate Activity Photo
+
+↓
+
+Save
+
+↓
+
+Share
+
+HOME SCREEN
+
+Purpose:
+User starts activity.
+
+Layout:
+
+Top:
+
+Profile
+
+Notification
+
+Settings
+
+Middle:
+
+Daily Summary
+
+Distance
+
+Time
+
+Calories
+
+Main Section:
+
+Three large activity cards:
+
+Walking
+
+Running
+
+Cycling
+
+Bottom:
+
+Recent Activities
+
+Buttons:
+
+History
+
+Profile
+
+ACTIVITY CARD BEHAVIOR
+
+Each activity card:
+
+Contains:
+
+Icon
+
+Description
+
+Estimated pace
+
+Last session
+
+Tap:
+
+Open activity setup.
+
+Long press:
+
+Open quick start.
+
+WALKING FLOW
+
+User taps:
+
+Walking
+
+↓
+
+OPEN:
+
+Walking Setup
+
+Screen shows:
+
+Activity Type
+
+GPS Status
+
+Watch Status
+
+Estimated Accuracy
+
+Settings:
+
+Auto Pause
+
+Audio Feedback
+
+GPS Accuracy
+
+Buttons:
+
+Cancel
+
+Start Walking
+
+WHEN START BUTTON PRESSED:
+
+System:
+
+Request GPS
+
+Validate signal
+
+Check watch
+
+Create session
+
+Start timer
+
+Open tracking screen
+
+LIVE WALKING SCREEN
+
+Top:
+
+GPS
+
+Battery
+
+Watch
+
+Center:
+
+Distance
+
+Time
+
+Current Pace
+
+Calories
+
+Bottom Buttons:
+
+Pause
+
+Stop
+
+Lock
+
+Camera
+
+DURING WALK:
+
+Every update:
+
+Collect location
+
+Validate movement
+
+Calculate distance
+
+Update route
+
+Update speed
+
+Update calories
+
+Sync watch
+
+Store local backup
+
+AUTO PAUSE:
+
+Trigger:
+
+No movement
+
+Pause timer
+
+Resume automatically.
+
+STOP:
+
+Ask:
+
+Finish?
+
+Save?
+
+Generate photo?
+
+SUMMARY:
+
+Show:
+
+Distance
+
+Duration
+
+Avg Pace
+
+Calories
+
+Map
+
+Weather
+
+Buttons:
+
+Save
+
+Generate Photo
+
+Share
+
+RUNNING FLOW
+
+Tap:
+
+Running
+
+↓
+
+Open Running Setup
+
+Options:
+
+Goal Distance
+
+Goal Duration
+
+Auto Pause
+
+Audio Updates
+
+Watch Source
+
+Button:
+
+Start Run
+
+START RUN
+
+System:
+
+Lock activity
+
+Activate tracking
+
+Enable background mode
+
+Open live tracking
+
+LIVE RUN SCREEN
+
+Metrics:
+
+Distance
+
+Current Pace
+
+Avg Pace
+
+Time
+
+Heart Rate
+
+Cadence
+
+Buttons:
+
+Pause
+
+Resume
+
+Stop
+
+Lock
+
+RUN CALCULATION
+
+Use:
+
+GPS
+
+Watch
+
+Movement
+
+Calculate:
+
+Split Pace
+
+Speed
+
+Calories
+
+Distance
+
+Detect:
+
+Running
+
+Walking
+
+Pause
+
+FINISH RUN
+
+Generate:
+
+Performance Summary
+
+Photo
+
+Statistics
+
+Save
+
+Share
+
+CYCLING FLOW
+
+Tap:
+
+Cycling
+
+↓
+
+Setup
+
+Options:
+
+Road
+
+Indoor
+
+Outdoor
+
+GPS Mode
+
+Button:
+
+Start Ride
+
+START
+
+Connect:
+
+Watch
+
+Sensors
+
+GPS
+
+Start route
+
+LIVE CYCLING
+
+Display:
+
+Distance
+
+Time
+
+Speed
+
+Avg Speed
+
+Elevation
+
+Calories
+
+Buttons:
+
+Pause
+
+Stop
+
+Lock
+
+CALCULATIONS
+
+Compute:
+
+Route
+
+Speed
+
+Elevation
+
+Movement
+
+Detect:
+
+Stops
+
+Turns
+
+Speed changes
+
+FINISH
+
+Create:
+
+Ride Summary
+
+Photo
+
+Stats
+
+Export
+
+SMARTWATCH FLOW
+
+User:
+
+Connect watch
+
+↓
+
+Authorize
+
+↓
+
+Sync
+
+↓
+
+Ready
+
+Watch Controls:
+
+Start
+
+Pause
+
+Stop
+
+Send Metrics
+
+Sync Background
+
+Recover Connection
+
+ACTIVITY PHOTO FLOW
+
+Finish
+
+↓
+
+Open Studio
+
+↓
+
+Upload User Photo
+
+↓
+
+Select Layout
+
+↓
+
+Generate
+
+↓
+
+Preview
+
+↓
+
+Download
+
+↓
+
+Share
+
+Include:
+
+Photo
+
+Distance
+
+Time
+
+Pace
+
+Calories
+
+Route
+
+Date
+
+Brand
+
+HISTORY FLOW
+
+History
+
+↓
+
+Select Activity
+
+↓
+
+Open Details
+
+↓
+
+View Route
+
+↓
+
+Generate Photo Again
+
+↓
+
+Share
+
+ERROR FLOW
+
+If GPS weak:
+
+Show warning.
+
+If watch disconnects:
+
+Retry sync.
+
+If no internet:
+
+Save offline.
+
+If app closes:
+
+Restore session.
+
+ADMIN FLOW
+
+View Users
+
+↓
+
+View Activities
+
+↓
+
+View Routes
+
+↓
+
+Analytics
+
+↓
+
+Reports
+
+↓
+
+Notifications
+
+FINAL OUTPUT
+
+Generate:
+
+Complete Flutter App
+
+Complete Admin Panel
+
+Backend
+
+Database
+
+Tracking Engine
+
+Smartwatch Sync
+
+Photo Studio
+
+All buttons, screens, calculations, transitions and flows must function together with production-quality architecture.

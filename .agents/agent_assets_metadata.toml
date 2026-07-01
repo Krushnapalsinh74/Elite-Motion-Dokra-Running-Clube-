@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ljsyAPkD4OWdgfmufLOGx"
+uri = "file://artifacts/mobile/assets/images/splash-bg.png"
+type = "image"
+title = "dokra splash background"

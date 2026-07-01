@@ -1,0 +1,356 @@
+Build a complete premium sports tracking platform inspired by the best experiences from Strava and Nike Run Club.
+
+Project Type:
+Production-grade application.
+
+Create:
+
+Mobile App (Android + iOS)
+Admin Web Panel
+Backend
+Database
+Wearable Integration
+Analytics System
+Activity Photo Generator
+
+Supported Activities ONLY:
+
+Walking
+Running
+Cycling
+
+Keep the product clean and professional.
+
+Do not create a clone visually. Create an original brand identity while supporting similar functionality.
+
+INCLUDE FEATURES INSPIRED BY STRAVA
+Activity Tracking
+GPS activity recording
+Distance tracking
+Duration tracking
+Speed
+Average pace
+Split analysis
+Route mapping
+Elevation
+Calories
+Background tracking
+Auto pause
+Resume
+Activity History
+Timeline
+Monthly history
+Weekly history
+Search
+Filters
+Personal records
+Statistics
+Weekly totals
+Monthly totals
+Yearly totals
+Trend charts
+Activity summaries
+Route Experience
+Route rendering
+Start/end markers
+Route preview
+Route replay
+Performance
+Pace zones
+Speed analysis
+Activity comparison
+Best performance tracking
+Goals
+Distance goals
+Weekly goals
+Monthly goals
+Progress indicators
+Challenges
+Daily challenge
+Weekly challenge
+Monthly challenge
+Achievements
+Milestones
+Badges
+Records
+Sharing
+Activity image
+Story format
+Post format
+Share to social media
+INCLUDE FEATURES INSPIRED BY NIKE RUN CLUB
+Guided Experience
+Activity start flow
+Goal selection
+Progress motivation
+Coaching
+Personalized targets
+Suggested activity plans
+Audio Support
+Voice updates
+Distance announcements
+Pace updates
+Workout Experience
+Live stats
+Milestone notifications
+Recovery Tracking
+Weekly balance
+Activity trends
+Personal Progress
+Goal completion
+Training insights
+AUTHENTICATION
+
+Real login only.
+
+Methods:
+
+Google Login
+
+Email Login
+
+Register
+
+Forgot Password
+
+Profile
+
+Session handling
+
+SMARTWATCH INTEGRATION
+
+Support:
+
+Wear OS
+
+Apple Watch
+
+Health Connect
+
+HealthKit
+
+Capabilities:
+
+Start activity
+
+Pause
+
+Stop
+
+Sync metrics
+
+Heart rate
+
+Calories
+
+Distance
+
+Background sync
+
+Offline sync
+
+Phone-free support where available
+
+GOOGLE INTEGRATION
+
+Official services only.
+
+Use:
+
+Google Maps
+
+Google Sign-In
+
+Location Services
+
+Health Connect
+
+Capabilities:
+
+Route tracking
+
+Map rendering
+
+Location permissions
+
+Live tracking
+
+ACTIVITY ACCURACY
+
+Highest priority.
+
+Implement:
+
+GPS smoothing
+
+Route optimization
+
+Pause detection
+
+Signal recovery
+
+Sensor validation
+
+Distance correction
+
+Confidence indicators
+
+Store raw + processed data.
+
+ACTIVITY PHOTO STUDIO
+
+After activity:
+
+Generate share image.
+
+Allow:
+
+Upload user photo
+
+Generate layout
+
+Edit template
+
+Add:
+
+Distance
+
+Pace
+
+Time
+
+Calories
+
+Route preview
+
+Date
+
+Download
+
+Share
+
+USER PROFILE
+
+Profile
+
+Statistics
+
+Records
+
+Connected Devices
+
+Privacy
+
+Settings
+
+Goals
+
+Achievements
+
+ADMIN WEB PANEL
+
+Pages:
+
+Dashboard
+
+Users
+
+Activities
+
+Reports
+
+Analytics
+
+Notifications
+
+Devices
+
+Settings
+
+Admin Roles
+
+Capabilities:
+
+View users
+
+Monitor activities
+
+Export reports
+
+Manage content
+
+View sync logs
+
+UI / UX
+
+Themes:
+
+Light
+
+Dark
+
+Auto
+
+Style:
+
+Premium
+
+Minimal
+
+Professional
+
+Athletic
+
+No emojis.
+
+Smooth animation.
+
+High-end experience.
+
+PERFORMANCE
+
+Fast startup
+
+Offline support
+
+Battery optimization
+
+Background sync
+
+Crash recovery
+
+SECURITY
+
+OAuth
+
+Encryption
+
+Role-based access
+
+Audit logs
+
+Permission controls
+
+OUTPUT
+
+Generate:
+
+Flutter mobile app
+
+Next.js admin
+
+Backend
+
+Database
+
+APIs
+
+Folder structure
+
+Environment setup
+
+Deployment guide
+
+Production-ready implementation
+
+All modules must connect and function together.

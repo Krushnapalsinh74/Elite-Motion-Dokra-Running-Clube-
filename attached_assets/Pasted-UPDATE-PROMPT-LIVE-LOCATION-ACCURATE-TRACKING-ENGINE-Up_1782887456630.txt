@@ -1,0 +1,316 @@
+UPDATE PROMPT — LIVE LOCATION + ACCURATE TRACKING ENGINE
+
+Update the existing sports tracking app.
+
+Do not redesign UI.
+
+Do not remove existing features.
+
+Add and improve only:
+
+Real-time location tracking
+Accurate distance counting
+Route drawing on map
+Background activity tracking
+Reliable counting during interruptions
+
+Supported activities remain:
+
+Walking
+Running
+Cycling
+LIVE LOCATION SYSTEM
+
+Use official map and location services.
+
+Requirements:
+
+Display user's live position continuously.
+
+Map must:
+
+Center on user.
+
+Show current marker.
+
+Update smoothly.
+
+Rotate with movement.
+
+Keep visible during activity.
+
+Map behavior:
+
+Zoom automatically.
+
+Allow manual zoom.
+
+Return-to-user button.
+
+ROUTE DRAWING
+
+While activity runs:
+
+Draw path continuously.
+
+Requirements:
+
+Start:
+Green marker
+
+Current:
+Moving marker
+
+Finish:
+Red marker
+
+Draw travelled route as:
+
+Continuous colored polyline
+
+Update live.
+
+Never redraw entire route.
+
+Append points.
+
+Smooth route.
+
+Remove jitter.
+
+Show total route preview after finish.
+
+DISTANCE COUNTING (MOST IMPORTANT)
+
+Distance must increase ONLY if real movement happens.
+
+Do NOT count:
+
+GPS jumps
+
+Signal drift
+
+Standing movement
+
+Map noise
+
+Phone shaking
+
+App background errors
+
+Implement:
+
+Movement validation
+
+Minimum movement threshold
+
+Speed validation
+
+GPS confidence checks
+
+Point filtering
+
+Distance smoothing
+
+Route cleanup
+
+Store:
+
+Raw points
+
+Processed points
+
+ACTIVITY DETECTION
+
+Count ONLY when:
+
+User is truly moving.
+
+Walking:
+Low speed.
+
+Running:
+Medium speed.
+
+Cycling:
+High speed.
+
+If user stops:
+
+Pause counting.
+
+Resume automatically.
+
+BACKGROUND TRACKING
+
+Tracking must continue if:
+
+Screen off
+
+App minimized
+
+Incoming call
+
+User opens another app
+
+Phone locked
+
+Temporary internet loss
+
+Requirements:
+
+Keep timer active.
+
+Keep location active.
+
+Continue route.
+
+Sync later.
+
+Recover session.
+
+Show status:
+
+Tracking Active.
+
+INTERRUPTION HANDLING
+
+Incoming Call:
+
+Keep tracking.
+
+Notification Open:
+
+Keep tracking.
+
+Lock Screen:
+
+Keep tracking.
+
+App Minimized:
+
+Keep tracking.
+
+GPS Lost:
+
+Pause updates.
+
+Recover automatically.
+
+Battery Saver:
+
+Warn user.
+
+Continue safely.
+
+LIVE TRACKING SCREEN UPDATE
+
+Top:
+
+GPS Status
+
+Tracking Status
+
+Watch Status
+
+Map
+
+Center:
+
+Distance
+
+Time
+
+Current Speed
+
+Avg Pace
+
+Calories
+
+Bottom:
+
+Pause
+
+Resume
+
+Stop
+
+Lock
+
+Camera
+
+Buttons:
+
+Pause:
+Stop counting.
+
+Resume:
+Continue.
+
+Stop:
+Finish activity.
+
+Lock:
+Prevent touches.
+
+SMARTWATCH DATA PRIORITY
+
+If watch connected:
+
+Use watch data when reliable.
+
+Combine:
+
+GPS
+
+Watch
+
+Motion
+
+Sync continuously.
+
+DATA STORAGE
+
+Save:
+
+Session
+
+Coordinates
+
+Distance
+
+Duration
+
+Route
+
+Pause Times
+
+Background Events
+
+Sync Status
+
+FINAL RESULT
+
+Summary must show:
+
+Exact route
+
+Total distance
+
+Total time
+
+Pace
+
+Speed
+
+Route image
+
+Confidence indicator
+
+Generate accurate final result.
+
+Update existing app architecture only.
+
+Keep UI and existing modules unchanged.
+
+Improve tracking reliability and continuity across interruptions.

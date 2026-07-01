@@ -1,0 +1,584 @@
+Build a complete production-ready sports tracking platform inspired by Strava and Nike Run Club.
+
+Project Name: (replace with your app name)
+
+Goal:
+Create a premium, professional sports tracking ecosystem with:
+
+Mobile App (Android + iOS)
+Admin Web Dashboard
+Backend APIs
+Database
+Smartwatch Connectivity
+Accurate Activity Tracking
+Auto Activity Share Card Generator
+
+Supported Activities ONLY:
+
+Walking
+Running
+Cycling
+
+Do NOT include social feed, AI emojis, gaming visuals, cartoon UI, fake metrics, or unnecessary features.
+
+TECHNOLOGY STACK
+
+Mobile:
+
+Flutter (latest stable)
+
+Admin:
+
+Next.js + TypeScript
+
+Backend:
+
+Firebase + Cloud Functions
+
+Database:
+
+Firestore
+
+Storage:
+
+Firebase Storage
+
+Authentication:
+
+Firebase Auth
+Google OAuth (official)
+Email + Password
+
+Maps:
+
+Google Maps SDK
+
+Location:
+
+Geolocator
+
+Notifications:
+
+Firebase Cloud Messaging
+
+Analytics:
+
+Firebase Analytics
+
+Wearables:
+
+Google Health Connect
+Apple HealthKit
+Wear OS
+Apple Watch
+
+Image Generation:
+
+Canvas rendering
+
+Deployment:
+
+Android
+iOS
+Web Admin
+AUTHENTICATION
+
+Implement real production login.
+
+Methods:
+
+Continue with Google
+Login with Email
+Register
+Forgot Password
+Logout
+
+Requirements:
+
+Secure session
+Token refresh
+Email verification
+Account recovery
+Duplicate prevention
+
+Store:
+
+uid
+fullName
+email
+profileImage
+createdAt
+lastLogin
+MOBILE APP
+
+Theme:
+Premium Sports UI
+
+Style:
+Minimal
+Luxury
+Professional
+
+No emoji usage.
+
+Colors:
+Primary:
+Black
+
+Accent:
+Orange
+
+Surface:
+Dark Gray
+
+Typography:
+Inter / SF Pro
+
+Animations:
+Smooth and subtle
+
+SCREEN FLOW
+
+Splash
+
+↓
+
+Login
+
+↓
+
+Permission Setup
+
+↓
+
+Dashboard
+
+↓
+
+Activity Tracking
+
+↓
+
+Activity Summary
+
+↓
+
+History
+
+↓
+
+Profile
+
+DASHBOARD
+
+Show:
+
+Today's Distance
+
+Total Time
+
+Calories
+
+Recent Activities
+
+Quick Start:
+
+Walking
+
+Running
+
+Cycling
+
+Weekly Progress
+
+Monthly Stats
+
+LIVE TRACKING
+
+Use GPS and sensors.
+
+Track:
+
+Distance
+
+Time
+
+Speed
+
+Average Pace
+
+Calories
+
+Route
+
+Elevation
+
+Current Status
+
+Requirements:
+
+High GPS accuracy
+
+Background tracking
+
+Battery optimization
+
+Pause detection
+
+Resume support
+
+Auto stop
+
+Route smoothing
+
+Signal recovery
+
+Live map rendering
+
+Distance filtering
+
+Timestamp tracking
+
+Activity validation
+
+ACTIVITY ACCURACY
+
+Accuracy is critical.
+
+Implement:
+
+GPS filtering
+
+Motion smoothing
+
+Kalman filtering
+
+Outlier removal
+
+Speed validation
+
+Sensor fusion
+
+Background tracking
+
+Location confidence scoring
+
+Distance recalculation
+
+Handle:
+
+Signal loss
+
+Indoor/outdoor transitions
+
+GPS drift
+
+Low battery mode
+
+Display confidence indicators.
+
+SMART WATCH CONNECTIVITY
+
+Support:
+
+Wear OS
+
+Apple Watch
+
+Health Connect
+
+HealthKit
+
+Features:
+
+Start from watch
+
+Pause from watch
+
+Stop from watch
+
+Heart rate
+
+Calories
+
+Distance
+
+Sync to mobile
+
+Background sync
+
+Offline sync
+
+Auto reconnect
+
+Watch activity transfer
+
+Phone not required during workout.
+
+ACTIVITY SUMMARY
+
+After finish:
+
+Generate summary.
+
+Show:
+
+Distance
+
+Duration
+
+Average Speed
+
+Average Pace
+
+Calories
+
+Heart Rate
+
+Map Route
+
+Weather
+
+Date
+
+Buttons:
+
+Save
+
+Share
+
+Download
+
+SHARE IMAGE GENERATOR
+
+Generate premium activity card.
+
+Include:
+
+Map Route
+
+Distance
+
+Duration
+
+Pace
+
+Calories
+
+Date
+
+Brand Logo
+
+High resolution.
+
+Formats:
+
+Instagram
+
+Story
+
+Square
+
+Landscape
+
+HISTORY
+
+Filters:
+
+Daily
+
+Weekly
+
+Monthly
+
+Yearly
+
+Search
+
+Export
+
+PROFILE
+
+Profile Photo
+
+Total Distance
+
+Achievements
+
+Connected Devices
+
+Privacy
+
+Settings
+
+ADMIN WEB PANEL
+
+Secure Admin Login.
+
+Pages:
+
+Dashboard
+
+Users
+
+Activities
+
+Analytics
+
+Reports
+
+Notifications
+
+Settings
+
+Admins
+
+ADMIN FEATURES
+
+Dashboard:
+
+Total Users
+
+Active Users
+
+Activity Count
+
+Retention
+
+Charts
+
+Users:
+
+View
+
+Search
+
+Suspend
+
+Delete
+
+Activities:
+
+View Routes
+
+Filter
+
+Export
+
+Reports:
+
+CSV
+
+Excel
+
+Notifications:
+
+Push messages
+
+Settings:
+
+API Keys
+
+Maps
+
+Branding
+
+DATABASE
+
+Collections:
+
+Users
+
+Activities
+
+Routes
+
+Devices
+
+Notifications
+
+Analytics
+
+Admins
+
+Settings
+
+Achievements
+
+SECURITY
+
+Role Based Access
+
+JWT
+
+Encrypted Storage
+
+API Validation
+
+Rate Limit
+
+Secure Logs
+
+Audit Trail
+
+Location Permission Control
+
+Privacy Controls
+
+PERFORMANCE
+
+Cold Start under 2 seconds
+
+Tracking update under 1 second
+
+Smooth scrolling
+
+Offline mode
+
+Auto sync
+
+Low battery usage
+
+Crash reporting
+
+TESTING
+
+Unit Tests
+
+Integration Tests
+
+GPS Tests
+
+Watch Tests
+
+Load Tests
+
+UI Tests
+
+OUTPUT
+
+Generate:
+
+Production folder structure
+
+Flutter app
+
+Next.js admin
+
+Backend
+
+Database schema
+
+API architecture
+
+Screens
+
+Components
+
+Deployment guide
+
+Environment variables
+
+Working build instructions
+
+Code should be modular, scalable, and production ready.

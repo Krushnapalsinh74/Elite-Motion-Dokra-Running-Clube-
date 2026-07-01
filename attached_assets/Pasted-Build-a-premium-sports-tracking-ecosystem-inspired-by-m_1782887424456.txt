@@ -1,0 +1,555 @@
+Build a premium sports tracking ecosystem inspired by modern fitness platforms.
+
+Product Type:
+Professional Sports Tracking Platform
+
+Supported Activities ONLY:
+
+Walking
+Running
+Cycling
+
+Create:
+
+Mobile App (Android + iOS)
+Admin Web Panel
+Backend
+Database
+Wearable Sync
+Activity Share Studio
+
+Goal:
+Professional, reliable, accurate and scalable.
+
+NAVIGATION STRUCTURE
+
+Bottom Navigation (5 tabs)
+
+Home
+
+Activity
+
+History
+
+Studio
+
+Profile
+
+Persistent navigation.
+
+Animated transitions.
+
+SCREEN 1 — SPLASH
+
+Purpose:
+Brand loading.
+
+Behavior:
+
+Load settings
+Restore session
+Sync local data
+
+Auto route:
+Logged in → Dashboard
+
+Not logged in → Login
+
+SCREEN 2 — LOGIN
+
+Buttons:
+
+Continue with Google
+
+Login with Email
+
+Create Account
+
+Forgot Password
+
+Behavior:
+Validate credentials.
+
+Create secure session.
+
+Store profile.
+
+SCREEN 3 — HOME
+
+Top Area:
+User greeting
+
+Profile image
+
+Notification icon
+
+Main Cards:
+
+Today's Distance
+
+Today's Time
+
+Calories
+
+Weekly Progress
+
+Quick Start Section:
+
+Walking
+
+Running
+
+Cycling
+
+Each button:
+
+Tap →
+Open tracking.
+
+Lower Section:
+
+Recent Activities
+
+Connected Devices
+
+Goals
+
+SCREEN 4 — START ACTIVITY
+
+Before Start:
+
+Choose:
+
+Walking
+
+Running
+
+Cycling
+
+Options:
+
+GPS Quality
+
+Auto Pause
+
+Audio Updates
+
+Smartwatch Source
+
+Buttons:
+
+Start
+
+Back
+
+SCREEN 5 — LIVE ACTIVITY
+
+Map occupies most screen.
+
+Top:
+
+Activity Type
+
+GPS Status
+
+Battery
+
+Center:
+
+Distance
+
+Time
+
+Speed
+
+Pace
+
+Calories
+
+Bottom Actions:
+
+Pause
+
+Resume
+
+Stop
+
+Lock
+
+Camera
+
+Button Behavior:
+
+Pause →
+Freeze counters.
+
+Resume →
+Continue.
+
+Stop →
+Open summary.
+
+Lock →
+Prevent accidental touches.
+
+TRACKING LOGIC
+
+Every update:
+
+Receive:
+
+GPS
+
+Watch Data
+
+Time
+
+Sensor State
+
+Calculate:
+
+Distance
+
+Speed
+
+Calories
+
+Validate:
+
+Movement
+
+Signal
+
+Confidence
+
+Handle:
+
+Weak GPS
+
+Battery saving
+
+Offline mode
+
+Signal recovery
+
+SCREEN 6 — ACTIVITY SUMMARY
+
+Header:
+
+Generated Hero Banner
+
+Sections:
+
+Distance
+
+Duration
+
+Average Pace
+
+Speed
+
+Calories
+
+Route
+
+Weather
+
+Buttons:
+
+Save
+
+Generate Photo
+
+Share
+
+Delete
+
+SCREEN 7 — PHOTO STUDIO
+
+User Flow:
+
+Open Studio
+
+↓
+
+Upload Photo
+
+↓
+
+Choose Layout
+
+↓
+
+Generate
+
+↓
+
+Download
+
+↓
+
+Share
+
+Templates:
+
+Story
+
+Square
+
+Landscape
+
+Controls:
+
+Crop
+
+Move
+
+Blur
+
+Text Position
+
+Logo Toggle
+
+Generate Image
+
+Output:
+
+High resolution.
+
+SCREEN 8 — HISTORY
+
+Filters:
+
+All
+
+Walking
+
+Running
+
+Cycling
+
+Week
+
+Month
+
+Year
+
+Card:
+
+Distance
+
+Date
+
+Duration
+
+Tap:
+
+Open Details.
+
+SCREEN 9 — ACTIVITY DETAILS
+
+Show:
+
+Map
+
+Timeline
+
+Speed Graph
+
+Pace Graph
+
+Splits
+
+Photo
+
+Buttons:
+
+Share
+
+Download
+
+Delete
+
+SCREEN 10 — PROFILE
+
+Show:
+
+Profile
+
+Total Distance
+
+Achievements
+
+Goals
+
+Connected Devices
+
+Settings
+
+SETTINGS
+
+Sections:
+
+Account
+
+Notifications
+
+Privacy
+
+Units
+
+Theme
+
+Watch Sync
+
+GPS Accuracy
+
+Theme:
+
+Light
+
+Dark
+
+System
+
+SMARTWATCH
+
+Devices:
+
+Wear OS
+
+Apple Watch
+
+Functions:
+
+Start
+
+Pause
+
+Stop
+
+Heart Rate
+
+Distance
+
+Calories
+
+Auto Sync
+
+Offline Sync
+
+Background Sync
+
+NOTIFICATIONS
+
+Activity Started
+
+Goal Completed
+
+Sync Completed
+
+Watch Connected
+
+ADMIN PANEL
+
+Sections:
+
+Dashboard
+
+Users
+
+Activities
+
+Analytics
+
+Reports
+
+Notifications
+
+Devices
+
+Settings
+
+Admins
+
+ADMIN FUNCTIONS
+
+View Users
+
+Disable User
+
+Export Data
+
+View Activities
+
+Manage Devices
+
+Push Notifications
+
+Manage APIs
+
+DATABASE
+
+Users
+
+Activities
+
+Routes
+
+Photos
+
+Devices
+
+Analytics
+
+Settings
+
+Notifications
+
+Admins
+
+SECURITY
+
+OAuth
+
+Encryption
+
+Access Control
+
+Permission System
+
+Logs
+
+PERFORMANCE
+
+Low Battery
+
+Fast Tracking
+
+Offline Support
+
+Background Sync
+
+Crash Recovery
+
+FINAL OUTPUT
+
+Generate:
+
+Flutter Mobile App
+
+Next.js Admin
+
+Backend
+
+Database
+
+API Architecture
+
+Folder Structure
+
+Deployment
+
+Documentation
+
+All buttons, screens, flows, calculations, syncing, and navigation must be connected and functional. Create an original design language with premium sports-app quality.

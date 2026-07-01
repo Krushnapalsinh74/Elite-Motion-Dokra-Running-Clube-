@@ -1,0 +1,409 @@
+Build a complete production-grade sports tracking ecosystem inspired by Strava and Nike Run Club.
+
+Create:
+
+Mobile App (Android + iOS)
+Admin Web Panel
+Backend
+Database
+Smartwatch Integration
+Activity Photo Generator
+
+Supported activities ONLY:
+
+Walking
+Running
+Cycling
+
+Design must feel premium, modern, athletic, professional and realistic.
+
+Do NOT use emojis, AI-style decorations, gaming UI, fake dashboards, or unnecessary social features.
+
+CORE REQUIREMENT (HIGHEST PRIORITY)
+
+Activity counting and tracking accuracy is the most important feature.
+
+The app must prioritize:
+
+Reliable tracking
+Stable sync
+Real sensor usage
+Consistent calculations
+Strong route accuracy
+
+Avoid:
+
+Fake movement
+GPS spikes
+Distance jumps
+Unreal pace calculations
+
+Display data confidence indicators when accuracy drops.
+
+GOOGLE INTEGRATION (REAL)
+
+Use official Google services only.
+
+Integrate:
+
+Authentication:
+
+Google Sign-In (official OAuth)
+
+Maps:
+
+Google Maps SDK
+
+Location:
+
+Android Location Services
+
+Fitness:
+
+Health Connect (Android)
+
+Features:
+
+Live map tracking
+Route recording
+Distance calculation
+Background tracking
+Permission handling
+Reconnect after signal loss
+
+Do not simulate Google services.
+
+SMART WATCH CONNECTIVITY (VERY IMPORTANT)
+
+Implement strong wearable support.
+
+Support:
+
+Android:
+
+Wear OS
+Health Connect
+
+iPhone:
+
+Apple Watch
+HealthKit
+
+Capabilities:
+
+Start activity from watch
+
+Pause from watch
+
+Stop from watch
+
+Receive:
+
+Heart Rate
+
+Steps
+
+Distance
+
+Calories
+
+Workout Time
+
+Sync automatically.
+
+Requirements:
+
+Watch → App sync
+
+Offline caching
+
+Reconnect after disconnect
+
+Background sync
+
+Phone-free workout support where supported
+
+Data conflict handling
+
+Battery optimization
+
+Sync status indicator
+
+ACTIVITY TRACKING ENGINE
+
+Activities:
+
+Walking
+
+Running
+
+Cycling
+
+Track:
+
+Distance
+
+Duration
+
+Speed
+
+Average Pace
+
+Elevation
+
+Calories
+
+Heart Rate
+
+Route
+
+Movement Status
+
+Requirements:
+
+GPS smoothing
+
+Signal recovery
+
+Pause detection
+
+Resume tracking
+
+Background tracking
+
+Route optimization
+
+Sensor validation
+
+Duplicate removal
+
+Confidence scoring
+
+Store raw + processed data.
+
+ACTIVITY PHOTO CREATOR (IMPORTANT)
+
+After workout completion:
+
+Generate a professional activity image.
+
+User flow:
+
+Open Summary
+
+Upload Photo (optional)
+
+Choose Template
+
+Generate
+
+Download
+
+Share
+
+Image must include:
+
+User uploaded photo
+
+Activity type
+
+Distance
+
+Duration
+
+Average pace
+
+Calories
+
+Date
+
+Route preview
+
+Brand logo
+
+Premium layout
+
+Export:
+
+Instagram Story
+
+Square Post
+
+Landscape
+
+Buttons:
+
+Download
+
+Share
+
+Save
+
+UI / UX
+
+Provide both:
+
+Light Theme
+
+Dark Theme
+
+Theme auto switch.
+
+Style:
+
+Premium
+
+Minimal
+
+Professional
+
+Athletic
+
+Luxury feel
+
+Typography:
+Inter / SF Pro
+
+No emojis.
+
+Screens:
+
+Splash
+
+Login
+
+Dashboard
+
+Live Activity
+
+Summary
+
+History
+
+Photo Creator
+
+Profile
+
+Settings
+
+ADMIN WEB PANEL
+
+Secure admin login.
+
+Pages:
+
+Dashboard
+
+Users
+
+Activities
+
+Wearable Sync Status
+
+Reports
+
+Notifications
+
+Settings
+
+Analytics
+
+Admin Roles
+
+Functions:
+
+User Management
+
+Activity Monitoring
+
+Export Reports
+
+Send Notifications
+
+Control APIs
+
+View Sync Logs
+
+DATABASE
+
+Collections:
+
+Users
+
+Activities
+
+Routes
+
+Wearables
+
+Photos
+
+Analytics
+
+Admins
+
+Settings
+
+Notifications
+
+Store:
+
+Raw sensor data
+
+Processed metrics
+
+Generated images
+
+SECURITY
+
+OAuth
+
+Encrypted tokens
+
+Role-based access
+
+API validation
+
+Secure storage
+
+Privacy controls
+
+Permission management
+
+PERFORMANCE
+
+Fast launch
+
+Low battery usage
+
+Smooth tracking
+
+Background sync
+
+Offline support
+
+Automatic recovery
+
+FINAL OUTPUT
+
+Generate:
+
+Complete Flutter app
+
+Complete Next.js admin panel
+
+Backend
+
+Database schema
+
+API architecture
+
+Folder structure
+
+Build instructions
+
+Deployment instructions
+
+Production-ready code
+
+All features should connect and function together.
