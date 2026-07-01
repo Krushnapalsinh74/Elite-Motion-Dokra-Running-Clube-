@@ -348,16 +348,24 @@ export class ActivityTracker {
     this._emitUpdate(pt.confidence, pt.isMoving);
   }
 
-  /** Compute steps: prefer pedometer, fall back to distance-based estimate */
+  /**
+   * Compute steps in priority order:
+   *  1. Hardware pedometer chip (most accurate, dedicated silicon)
+   *  2. Accelerometer peak detection (works indoors with no GPS)
+   *  3. Distance-based estimate (last resort — inaccurate indoors)
+   */
   private _computeSteps(): number {
-    if (this.motionState.pedometerActive) {
+    if (this.activityType === "cycling") return 0;
+
+    // motionState.steps is hw steps when pedometerActive=true,
+    // or accel-detected steps when pedometerActive=false.
+    // Either is more accurate than distance-based.
+    if (this.motionState.steps > 0) {
       return this.motionState.steps;
     }
-    // Distance-based fallback (good enough when pedometer unavailable)
-    if (this.activityType !== "cycling") {
-      return Math.round(this.distanceM * STEPS_PER_METER[this.activityType]);
-    }
-    return 0;
+
+    // Last resort: distance-based estimate (only useful with GPS outdoors)
+    return Math.round(this.distanceM * STEPS_PER_METER[this.activityType]);
   }
 
   private _emitUpdate(confidence?: number, isMoving?: boolean) {
