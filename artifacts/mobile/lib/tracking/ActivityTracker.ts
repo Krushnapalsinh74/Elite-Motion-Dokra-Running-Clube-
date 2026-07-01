@@ -5,6 +5,9 @@
  * - Sends timer updates every second regardless of GPS
  * - Proper GPS permission handling
  * - Better initial state (not stuck at 0%)
+ * - Uses device GPS speed (more accurate than delta-based)
+ * - EMA speed smoothing (no spikes)
+ * - Fixed simulation path (consistent distance per tick)
  */
 
 import * as Location from "expo-location";
@@ -53,6 +56,9 @@ const SIM_SPEED: Record<ActivityType, number> = {
   cycling: 20.0,
 };
 
+// EMA alpha for speed smoothing — higher = more responsive, lower = smoother
+const SPEED_EMA_ALPHA = 0.25;
+
 export class ActivityTracker {
   private gpsEngine: GpsAccuracyEngine;
   private sensorFusion: SensorFusion;
@@ -67,14 +73,17 @@ export class ActivityTracker {
   private pauseStart: number | null = null;
   private isPaused = false;
   private motionState: MotionState = { isMoving: true, magnitude: 0, steps: 0, stepsPerMinute: 0, confidence: 0.5 };
-  private lastSpeedKmh = 0;
-  private speedHistory: number[] = [];
+  private smoothedSpeedKmh = 0;
   private onUpdate: TrackingCallback;
   private activityType: ActivityType;
   private weightKg: number;
   private isSimulating = false;
   private gpsStatus: TrackingUpdate["gpsStatus"] = "acquiring";
-  private lastUpdateTime = 0;
+
+  // Simulation state — maintain real current position
+  private simLat = 28.6139;
+  private simLon = 77.2090;
+  private simHeading = 0;
 
   constructor(activityType: ActivityType, onUpdate: TrackingCallback, weightKg = 70) {
     this.activityType = activityType;
@@ -90,6 +99,7 @@ export class ActivityTracker {
     this.distanceM = 0;
     this.pausedMs = 0;
     this.isPaused = false;
+    this.smoothedSpeedKmh = 0;
     this.gpsEngine.reset();
     this.gpsStatus = "acquiring";
 
@@ -128,7 +138,8 @@ export class ActivityTracker {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
             accuracy: loc.coords.accuracy ?? 50,
-            speed: loc.coords.speed,
+            // Use device GPS speed when available — more accurate than delta computation
+            speed: loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null,
             altitude: loc.coords.altitude,
             timestamp: loc.timestamp,
           };
@@ -144,6 +155,16 @@ export class ActivityTracker {
 
           const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
           if (!filtered) return;
+
+          // Feed device GPS speed into smoother if available
+          if (raw.speed != null) {
+            const gpsSpeedKmh = raw.speed * 3.6;
+            const maxSpeed = this.activityType === "cycling" ? 90 : 40;
+            const clipped = Math.min(gpsSpeedKmh, maxSpeed);
+            this.smoothedSpeedKmh =
+              this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + clipped * SPEED_EMA_ALPHA;
+          }
+
           this._acceptPoint(filtered);
         }
       );
@@ -157,35 +178,53 @@ export class ActivityTracker {
     this.gpsStatus = "simulated";
     const speedKmh = SIM_SPEED[this.activityType];
     const speedMs = speedKmh / 3.6;
-    const baseLat = 28.6139;
-    const baseLon = 77.2090;
-    let step = 0;
+
+    // Start at a realistic location
+    this.simLat = 28.6139;
+    this.simLon = 77.2090;
+    this.simHeading = 0;
+
+    let simStep = 0;
 
     this.simInterval = setInterval(() => {
       if (this.isPaused) return;
-      step++;
+      simStep++;
+
       const ts = Date.now();
-      const angle = (step * 5 * Math.PI) / 180;
+      // Advance position 2 seconds of travel at our speed; gently curve heading
       const dist = speedMs * 2;
-      const latDelta = (dist * Math.cos(angle)) / 111320;
-      const lonDelta = (dist * Math.sin(angle)) / (111320 * Math.cos((baseLat * Math.PI) / 180));
+      this.simHeading = (this.simHeading + 7) % 360; // gentle curve
+
+      const headingRad = (this.simHeading * Math.PI) / 180;
+      this.simLat += (dist * Math.cos(headingRad)) / 111320;
+      this.simLon +=
+        (dist * Math.sin(headingRad)) /
+        (111320 * Math.cos((this.simLat * Math.PI) / 180));
 
       const filtered: FilteredPoint = {
-        latitude: baseLat + step * latDelta,
-        longitude: baseLon + step * lonDelta,
+        latitude: this.simLat,
+        longitude: this.simLon,
         altitude: 215,
         timestamp: ts,
         accuracy: 5,
-        confidence: 0.92,
+        confidence: 0.95,
         isMoving: true,
       };
+
       this.motionState = {
         isMoving: true,
         magnitude: 9.8,
-        steps: Math.round(step * 2.4),
+        steps: Math.round(simStep * (this.activityType === "cycling" ? 0 : 2.4)),
         stepsPerMinute: this.activityType === "cycling" ? 0 : 155,
         confidence: 0.9,
       };
+
+      // Simulate smooth speed with slight noise
+      const noiseKmh = (Math.random() - 0.5) * 0.4;
+      const targetSpeed = speedKmh + noiseKmh;
+      this.smoothedSpeedKmh =
+        this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + targetSpeed * SPEED_EMA_ALPHA;
+
       this._acceptPoint(filtered);
     }, 2000);
   }
@@ -203,7 +242,24 @@ export class ActivityTracker {
     if (this.coords.length > 0 && pt.isMoving) {
       const prev = this.coords[this.coords.length - 1];
       const d = haversineM(prev.latitude, prev.longitude, tp.latitude, tp.longitude);
-      if (d < 500) this.distanceM += d; // ignore GPS jumps > 500m
+      if (d < 500) {
+        this.distanceM += d;
+        // Update speed from position delta only if we don't have a GPS speed feed
+        if (!this.isSimulating) {
+          const dtS = Math.max((tp.timestamp - prev.timestamp) / 1000, 0.1);
+          const derivedKmh = Math.min((d / dtS) * 3.6, this.activityType === "cycling" ? 90 : 40);
+          // Only use derived speed if GPS speed wasn't provided (smoothedSpeedKmh already updated for GPS devices)
+          // We detect "GPS speed not available" if smoothedSpeedKmh is 0 and coords just started
+          if (this.smoothedSpeedKmh === 0) {
+            this.smoothedSpeedKmh = derivedKmh;
+          } else {
+            // Secondary EMA update from position delta (blended, lower weight)
+            this.smoothedSpeedKmh =
+              this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA * 0.5) +
+              derivedKmh * (SPEED_EMA_ALPHA * 0.5);
+          }
+        }
+      }
     }
     this.coords.push(tp);
     this._emitUpdate(pt.confidence, pt.isMoving);
@@ -213,20 +269,17 @@ export class ActivityTracker {
     const elapsedS = this._elapsedSeconds();
     const conf = confidence ?? (this.coords.length > 0 ? this.coords[this.coords.length - 1].confidence : 0);
     const moving = isMoving ?? this.motionState.isMoving;
-    const speedKmh = this._instantSpeed();
-    this.speedHistory.push(speedKmh);
-    if (this.speedHistory.length > 30) this.speedHistory.shift();
 
-    const avgSpeed = this.speedHistory.length > 0
-      ? this.speedHistory.reduce((a, b) => a + b, 0) / this.speedHistory.length
-      : 0;
+    // True average speed = total distance / total time (most accurate for pace/summary)
+    const trueAvgKmh =
+      elapsedS > 0 ? (this.distanceM / 1000) / (elapsedS / 3600) : 0;
 
     this.onUpdate({
       coords: [...this.coords],
       distanceM: this.distanceM,
-      currentSpeedKmh: speedKmh,
-      avgSpeedKmh: avgSpeed,
-      avgPaceMinPerKm: avgSpeed > 0 ? 60 / avgSpeed : 0,
+      currentSpeedKmh: this.smoothedSpeedKmh,      // EMA smoothed — no spikes
+      avgSpeedKmh: trueAvgKmh,                      // true average over session
+      avgPaceMinPerKm: trueAvgKmh > 0 ? 60 / trueAvgKmh : 0,
       calories: this._calcCalories(elapsedS),
       steps: this.motionState.steps,
       cadence: this.motionState.stepsPerMinute,
@@ -235,15 +288,6 @@ export class ActivityTracker {
       elapsedSeconds: elapsedS,
       gpsStatus: this.gpsStatus,
     });
-  }
-
-  private _instantSpeed(): number {
-    if (this.coords.length < 2) return 0;
-    const a = this.coords[this.coords.length - 2];
-    const b = this.coords[this.coords.length - 1];
-    const dtS = Math.max((b.timestamp - a.timestamp) / 1000, 0.1);
-    const distM = haversineM(a.latitude, a.longitude, b.latitude, b.longitude);
-    return Math.min((distM / dtS) * 3.6, this.activityType === "cycling" ? 90 : 40);
   }
 
   private _elapsedSeconds(): number {

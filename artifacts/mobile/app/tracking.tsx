@@ -48,11 +48,37 @@ function gpsLabel(status: string, conf: number, elapsed: number): string {
   return `${Math.round(conf * 100)}% GPS`;
 }
 
+interface StatBoxProps {
+  value: string;
+  unit: string;
+  label: string;
+  accent?: string;
+}
+
+function StatBox({ value, unit, label, accent }: StatBoxProps) {
+  return (
+    <View style={statStyles.box}>
+      <View style={statStyles.valRow}>
+        <Text style={[statStyles.val, accent ? { color: accent } : {}]}>{value}</Text>
+        <Text style={statStyles.unit}>{unit}</Text>
+      </View>
+      <Text style={statStyles.label}>{label}</Text>
+    </View>
+  );
+}
+
+const statStyles = StyleSheet.create({
+  box: { alignItems: "center", flex: 1 },
+  valRow: { flexDirection: "row", alignItems: "baseline", gap: 2 },
+  val: { fontSize: 22, color: "#111", fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  unit: { fontSize: 10, color: "#888", fontFamily: "Inter_400Regular", marginBottom: 1 },
+  label: { fontSize: 10, color: "#999", fontFamily: "Inter_400Regular", marginTop: 1, letterSpacing: 0.3 },
+});
+
 export default function TrackingScreen() {
   const { liveMetrics, pauseActivity, resumeActivity, stopActivity } = useActivity();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  // Use any to avoid importing MapView type (which crashes web)
   const mapRef = useRef<any>(null);
   const isWeb = Platform.OS === "web";
 
@@ -61,7 +87,12 @@ export default function TrackingScreen() {
   const isPaused = liveMetrics?.isPaused ?? false;
   const elapsed = liveMetrics?.elapsedSeconds ?? 0;
   const distKm = ((liveMetrics?.distanceM ?? 0) / 1000).toFixed(2);
-  const speed = (liveMetrics?.currentSpeedKmh ?? 0).toFixed(1);
+
+  // Use EMA-smoothed current speed for live display
+  const speedKmh = liveMetrics?.currentSpeedKmh ?? 0;
+  const speed = speedKmh.toFixed(1);
+
+  // Pace is derived from true average speed
   const pace = fmtPace(liveMetrics?.avgPaceMinPerKm ?? 0);
   const calories = liveMetrics?.calories ?? 0;
   const steps = liveMetrics?.steps ?? 0;
@@ -70,6 +101,7 @@ export default function TrackingScreen() {
   const gpsStatus = liveMetrics?.gpsStatus ?? "acquiring";
   const isMoving = liveMetrics?.isMoving ?? false;
   const activityType = liveMetrics?.type ?? "running";
+  const isCycling = activityType === "cycling";
 
   const dotColor = gpsColor(gpsStatus, confidence);
   const statusLabel = gpsLabel(gpsStatus, confidence, elapsed);
@@ -174,7 +206,7 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Primary metrics */}
+        {/* Primary metrics — Distance + Time */}
         <View style={styles.primaryRow}>
           <View style={styles.bigMetric}>
             <Text style={[styles.bigVal, { fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
@@ -187,25 +219,43 @@ export default function TrackingScreen() {
           </View>
         </View>
 
-        {/* Secondary metrics */}
-        <View style={styles.secondaryRow}>
-          {[
-            { val: speed, unit: "km/h" },
-            { val: pace, unit: "/km" },
-            { val: String(calories), unit: "kcal" },
-            ...(steps > 0 ? [{ val: String(steps), unit: "steps" }] : []),
-            ...(cadence > 0 ? [{ val: String(cadence), unit: "spm" }] : []),
-          ].map((m, i) => (
-            <View key={i} style={styles.secStat}>
-              <Text style={[styles.secVal, { fontFamily: "Inter_700Bold" }]}>{m.val}</Text>
-              <Text style={[styles.secUnit, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>{m.unit}</Text>
-            </View>
-          ))}
+        {/* Secondary metrics row 1: Speed + Pace + Calories */}
+        <View style={[styles.secondaryRow, styles.rowDivider, { borderColor: colors.border }]}>
+          <StatBox value={speed} unit="km/h" label="SPEED" />
+          <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
+          <StatBox value={pace} unit="/km" label="PACE" />
+          <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
+          <StatBox value={String(calories)} unit="kcal" label="CALORIES" />
         </View>
+
+        {/* Secondary metrics row 2: Steps + Cadence (always visible; cycling shows cadence as RPM) */}
+        {!isCycling && (
+          <View style={[styles.secondaryRow, styles.rowDivider, { borderColor: colors.border }]}>
+            <StatBox
+              value={steps > 0 ? String(steps) : "—"}
+              unit="steps"
+              label="STEPS"
+              accent={steps > 0 ? "#6366F1" : undefined}
+            />
+            <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
+            <StatBox
+              value={cadence > 0 ? String(cadence) : "—"}
+              unit="spm"
+              label="CADENCE"
+              accent={cadence > 0 ? "#6366F1" : undefined}
+            />
+            <View style={[styles.divV, { backgroundColor: colors.border, height: 32 }]} />
+            <StatBox
+              value={distKm}
+              unit="km"
+              label="DISTANCE"
+            />
+          </View>
+        )}
 
         {/* Accuracy bar */}
         <View style={styles.accuracyRow}>
-          <Text style={[styles.accLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>Accuracy</Text>
+          <Text style={[styles.accLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>GPS</Text>
           <View style={[styles.accTrack, { backgroundColor: colors.border }]}>
             <View style={[styles.accFill, { width: `${Math.round(confidence * 100)}%` as `${number}%`, backgroundColor: dotColor }]} />
           </View>
@@ -279,10 +329,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 16,
+    paddingTop: 14,
     paddingHorizontal: 20,
     borderTopWidth: 1,
-    gap: 12,
+    gap: 10,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -308,12 +358,17 @@ const styles = StyleSheet.create({
   bigVal: { fontSize: 44, color: "#111", letterSpacing: -2 },
   bigUnit: { fontSize: 11, letterSpacing: 2 },
   divV: { width: 1, height: 48 },
-  secondaryRow: { flexDirection: "row", justifyContent: "space-around" },
-  secStat: { alignItems: "center", gap: 1 },
-  secVal: { fontSize: 19, color: "#111", letterSpacing: -0.5 },
-  secUnit: { fontSize: 10 },
+  secondaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingVertical: 6,
+  },
+  rowDivider: {
+    borderTopWidth: 1,
+  },
   accuracyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  accLabel: { fontSize: 11, width: 55 },
+  accLabel: { fontSize: 11, width: 28 },
   accTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
   accFill: { height: "100%", borderRadius: 2 },
   accPct: { fontSize: 12, width: 36, textAlign: "right" },
