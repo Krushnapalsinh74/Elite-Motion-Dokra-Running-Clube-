@@ -3,9 +3,13 @@
  *
  * Completely defensive: if any sensor fails to initialize, we fall back
  * gracefully to "always moving" rather than crashing the app.
+ *
+ * Fixes:
+ * - Requests ACTIVITY_RECOGNITION permission on Android 10+ before pedometer
+ * - Exposes pedometerActive flag so tracker can use distance-based fallback
  */
 
-import { Platform } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 
 export interface MotionState {
   isMoving: boolean;
@@ -13,10 +17,11 @@ export interface MotionState {
   steps: number;
   stepsPerMinute: number;
   confidence: number;
+  pedometerActive: boolean;
 }
 
-const STILL_THRESHOLD = 0.3;
-const MOVING_THRESHOLD = 0.7;
+const STILL_THRESHOLD = 0.25;
+const MOVING_THRESHOLD = 0.6;
 const HISTORY_SIZE = 10;
 
 export class SensorFusion {
@@ -29,6 +34,7 @@ export class SensorFusion {
     steps: 0,
     stepsPerMinute: 0,
     confidence: 0.5,
+    pedometerActive: false,
   };
   private onUpdate: (state: MotionState) => void;
   private baselineSteps: number | null = null;
@@ -42,8 +48,7 @@ export class SensorFusion {
 
   async start(activityType: "walking" | "running" | "cycling") {
     if (Platform.OS === "web") {
-      // Web: always moving, no sensors
-      this.emit({ isMoving: true, magnitude: 9.8, steps: 0, stepsPerMinute: 0, confidence: 0.5 });
+      this.emit({ isMoving: true, magnitude: 9.8, steps: 0, stepsPerMinute: 0, confidence: 0.5, pedometerActive: false });
       return;
     }
 
@@ -83,13 +88,32 @@ export class SensorFusion {
         });
       });
     } catch {
-      // Accelerometer unavailable — assume moving
       this.emit({ ...this.motionState, isMoving: true, confidence: 0.5 });
     }
   }
 
   private async _startPedometer() {
     try {
+      // Android 10+ requires ACTIVITY_RECOGNITION permission at runtime
+      if (Platform.OS === "android") {
+        try {
+          const granted = await PermissionsAndroid.request(
+            "android.permission.ACTIVITY_RECOGNITION" as any,
+            {
+              title: "Activity Recognition",
+              message: "Dokra needs activity recognition to count your steps accurately.",
+              buttonPositive: "Allow",
+              buttonNegative: "Deny",
+            }
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            return;
+          }
+        } catch {
+          // Permission API not available — continue anyway
+        }
+      }
+
       const SensorsModule = await import("expo-sensors");
       const { Pedometer } = SensorsModule;
 
@@ -112,6 +136,9 @@ export class SensorFusion {
         if (this.baselineSteps === null) {
           this.baselineSteps = total;
           this.previousSteps = 0;
+          // Mark pedometer as active as soon as we get first reading
+          this.emit({ ...this.motionState, pedometerActive: true });
+          return;
         }
 
         const sessionSteps = Math.max(0, total - this.baselineSteps);
@@ -122,17 +149,16 @@ export class SensorFusion {
         let spm = this.motionState.stepsPerMinute;
         if (newSteps > 0 && dtMin > 0) {
           const instantSpm = newSteps / dtMin;
-          // Exponential moving average for smooth cadence
           spm = Math.round(spm * 0.7 + instantSpm * 0.3);
         }
 
         this.previousSteps = sessionSteps;
         this.lastStepTimestamp = now;
 
-        this.emit({ ...this.motionState, steps: sessionSteps, stepsPerMinute: spm });
+        this.emit({ ...this.motionState, steps: sessionSteps, stepsPerMinute: spm, pedometerActive: true });
       });
     } catch {
-      // Pedometer unavailable — just don't count steps
+      // Pedometer unavailable
     }
   }
 

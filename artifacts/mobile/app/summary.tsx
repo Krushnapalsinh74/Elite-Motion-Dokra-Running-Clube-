@@ -1,15 +1,18 @@
 /**
  * Activity Summary Screen
  *
- * Shows the complete activity breakdown after finishing.
- * Shareable poster is built as a React Native view and shared
- * via the native Share API (text + stats). No native screenshot
- * library needed — works in Expo Go.
+ * Shows complete activity breakdown after finishing.
+ * Features:
+ * - Shareable poster card captured as a real PNG image (react-native-view-shot)
+ * - Save to Camera Roll via expo-media-library
+ * - Share image via native share sheet
  */
 
 import { Feather } from "@expo/vector-icons";
+import * as MediaLibrary from "expo-media-library";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import * as Sharing from "expo-sharing";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -21,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { captureRef } from "react-native-view-shot";
 
 import { Activity, useActivity } from "@/contexts/ActivityContext";
 import { useColors } from "@/hooks/useColors";
@@ -65,6 +69,8 @@ export default function SummaryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [saved, setSaved] = useState(false);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const posterRef = useRef<View>(null);
 
   const activity: Activity | null = params.activityJson
     ? JSON.parse(params.activityJson as string)
@@ -107,7 +113,7 @@ export default function SummaryScreen() {
     setSaved(true);
   }
 
-  async function handleShare() {
+  async function handleShareText() {
     const msg =
       `🏃 ${LABEL[activity!.type]} Complete!\n` +
       `📍 Distance: ${distKm} km\n` +
@@ -121,6 +127,86 @@ export default function SummaryScreen() {
     try {
       await Share.share({ message: msg, title: "Dokra Activity" });
     } catch {}
+  }
+
+  async function handleSavePhoto() {
+    if (isWeb) {
+      alert("Photo saving is not available on web.");
+      return;
+    }
+
+    if (!posterRef.current) return;
+    setPhotoSaving(true);
+
+    try {
+      // Capture the poster card as a PNG image
+      const uri = await captureRef(posterRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
+
+      // Request media library permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status === "granted") {
+        // Save to camera roll
+        await MediaLibrary.saveToLibraryAsync(uri);
+        Alert.alert(
+          "Photo Saved! 📸",
+          "Your activity photo has been saved to your Camera Roll.",
+          [{ text: "OK" }]
+        );
+      } else {
+        // Permission denied — try sharing instead
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(uri, {
+            mimeType: "image/png",
+            dialogTitle: "Save your activity photo",
+          });
+        } else {
+          Alert.alert("Permission Required", "Please allow access to your photo library to save activity photos.");
+        }
+      }
+    } catch (e) {
+      Alert.alert("Error", "Could not save photo. Please try again.");
+    } finally {
+      setPhotoSaving(false);
+    }
+  }
+
+  async function handleSharePhoto() {
+    if (isWeb) {
+      handleShareText();
+      return;
+    }
+
+    if (!posterRef.current) return;
+    setPhotoSaving(true);
+
+    try {
+      const uri = await captureRef(posterRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: "Share your activity",
+        });
+      } else {
+        // Fall back to text share
+        await handleShareText();
+      }
+    } catch {
+      await handleShareText();
+    } finally {
+      setPhotoSaving(false);
+    }
   }
 
   function handleDiscard() {
@@ -140,8 +226,12 @@ export default function SummaryScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Poster card */}
-        <View style={[styles.poster, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Poster card — captured for photo generation */}
+        <View
+          ref={posterRef}
+          collapsable={false}
+          style={[styles.poster, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
           {/* Orange header band */}
           <View style={[styles.posterHeader, { backgroundColor: colors.primary }]}>
             <Text style={[styles.posterBrand, { fontFamily: "Inter_700Bold" }]}>DOKRA</Text>
@@ -166,6 +256,7 @@ export default function SummaryScreen() {
                 { label: "Time", value: fmtDuration(activity.duration) },
                 { label: "Pace", value: fmtPace(activity.avgPace) },
                 { label: "Cal", value: `${activity.calories}` },
+                ...(activity.steps > 0 ? [{ label: "Steps", value: String(activity.steps) }] : []),
               ].map((s) => (
                 <View key={s.label} style={styles.quickStat}>
                   <Text style={[styles.quickVal, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
@@ -191,6 +282,15 @@ export default function SummaryScreen() {
                 weekday: "long", month: "long", day: "numeric", year: "numeric",
               })}
             </Text>
+
+            {activity.isSimulated && (
+              <View style={[styles.simBadge, { backgroundColor: "#3B82F618", borderColor: "#3B82F655" }]}>
+                <Feather name="info" size={11} color="#3B82F6" />
+                <Text style={[styles.simText, { color: "#3B82F6", fontFamily: "Inter_400Regular" }]}>
+                  Simulated activity
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -236,9 +336,42 @@ export default function SummaryScreen() {
             </Pressable>
           )}
 
-          <View style={styles.row}>
+          {/* Photo actions row */}
+          {!isWeb && (
+            <View style={styles.row}>
+              <Pressable
+                onPress={handleSavePhoto}
+                disabled={photoSaving}
+                style={({ pressed }) => [
+                  styles.btnSecondary,
+                  { backgroundColor: colors.primary + "15", borderColor: colors.primary + "55", opacity: pressed || photoSaving ? 0.7 : 1 },
+                ]}
+              >
+                <Feather name="image" size={17} color={colors.primary} />
+                <Text style={[styles.btnSecText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+                  {photoSaving ? "Saving..." : "Save Photo"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleSharePhoto}
+                disabled={photoSaving}
+                style={({ pressed }) => [
+                  styles.btnSecondary,
+                  { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed || photoSaving ? 0.7 : 1 },
+                ]}
+              >
+                <Feather name="share-2" size={17} color={colors.foreground} />
+                <Text style={[styles.btnSecText, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
+                  Share
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {isWeb && (
             <Pressable
-              onPress={handleShare}
+              onPress={handleShareText}
               style={({ pressed }) => [
                 styles.btnSecondary,
                 { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
@@ -247,20 +380,20 @@ export default function SummaryScreen() {
               <Feather name="share-2" size={17} color={colors.foreground} />
               <Text style={[styles.btnSecText, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>Share</Text>
             </Pressable>
+          )}
 
-            {!saved && (
-              <Pressable
-                onPress={handleDiscard}
-                style={({ pressed }) => [
-                  styles.btnSecondary,
-                  { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <Feather name="trash-2" size={17} color={colors.destructive} />
-                <Text style={[styles.btnSecText, { color: colors.destructive, fontFamily: "Inter_600SemiBold" }]}>Discard</Text>
-              </Pressable>
-            )}
-          </View>
+          {!saved && (
+            <Pressable
+              onPress={handleDiscard}
+              style={({ pressed }) => [
+                styles.btnSecondary,
+                { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Feather name="trash-2" size={17} color={colors.destructive} />
+              <Text style={[styles.btnSecText, { color: colors.destructive, fontFamily: "Inter_600SemiBold" }]}>Discard</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -283,7 +416,7 @@ const styles = StyleSheet.create({
   typeIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
   typeLabel: { fontSize: 16 },
   heroDist: { fontSize: 52, letterSpacing: -2 },
-  quickRow: { flexDirection: "row", gap: 24 },
+  quickRow: { flexDirection: "row", gap: 20, flexWrap: "wrap", justifyContent: "center" },
   quickStat: { alignItems: "center", gap: 2 },
   quickVal: { fontSize: 17 },
   quickLabel: { fontSize: 11 },
@@ -293,6 +426,11 @@ const styles = StyleSheet.create({
   },
   confText: { fontSize: 11 },
   dateStr: { fontSize: 12 },
+  simBadge: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  simText: { fontSize: 11 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

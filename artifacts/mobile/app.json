@@ -52,6 +52,14 @@
         {
           "motionPermission": "Dokra uses motion sensors to count your steps."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Dokra to save activity photos to your Camera Roll.",
+          "savePhotosPermission": "Allow Dokra to save activity photos.",
+          "isAccessMediaLocationEnabled": true
+        }
       ]
     ],
     "experiments": {
