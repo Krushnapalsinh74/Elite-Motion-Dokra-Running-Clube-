@@ -110,11 +110,7 @@ export class ActivityTracker {
       if (!this.isPaused) this._emitUpdate();
     }, 1000);
 
-    if (Platform.OS !== "web") {
-      await this._startGps();
-    } else {
-      this._startSimulation();
-    }
+    await this._startGps();
   }
 
   private async _startGps() {
