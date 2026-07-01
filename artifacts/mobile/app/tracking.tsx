@@ -9,7 +9,6 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import TrackingMap from "@/components/TrackingMap";
@@ -34,18 +33,17 @@ function fmtPace(minPerKm: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function gpsStatusColor(status: string, conf: number): string {
+function gpsColor(status: string, conf: number): string {
   if (status === "simulated") return "#3B82F6";
   if (status === "locked" || conf >= 0.7) return "#10B981";
   if (status === "acquiring" || conf >= 0.4) return "#F59E0B";
   return "#EF4444";
 }
 
-function gpsStatusLabel(status: string, conf: number, elapsed: number): string {
+function gpsLabel(status: string, conf: number, elapsed: number): string {
   if (status === "simulated") return "Simulated";
-  if (elapsed < 5) return "Acquiring...";
+  if (elapsed < 5 || status === "acquiring") return "Acquiring...";
   if (status === "locked") return `${Math.round(conf * 100)}% GPS`;
-  if (status === "acquiring") return "Acquiring...";
   if (status === "poor") return "Poor GPS";
   return `${Math.round(conf * 100)}% GPS`;
 }
@@ -54,7 +52,8 @@ export default function TrackingScreen() {
   const { liveMetrics, pauseActivity, resumeActivity, stopActivity } = useActivity();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
+  // Use any to avoid importing MapView type (which crashes web)
+  const mapRef = useRef<any>(null);
   const isWeb = Platform.OS === "web";
 
   const coords = liveMetrics?.coords ?? [];
@@ -72,20 +71,22 @@ export default function TrackingScreen() {
   const isMoving = liveMetrics?.isMoving ?? false;
   const activityType = liveMetrics?.type ?? "running";
 
-  const dotColor = gpsStatusColor(gpsStatus, confidence);
-  const statusLabel = gpsStatusLabel(gpsStatus, confidence, elapsed);
+  const dotColor = gpsColor(gpsStatus, confidence);
+  const statusLabel = gpsLabel(gpsStatus, confidence, elapsed);
 
   useEffect(() => {
     if (lastCoord && mapRef.current && !isWeb) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: lastCoord.latitude,
-          longitude: lastCoord.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        },
-        500
-      );
+      try {
+        mapRef.current.animateToRegion(
+          {
+            latitude: lastCoord.latitude,
+            longitude: lastCoord.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          },
+          500
+        );
+      } catch {}
     }
   }, [lastCoord, isWeb]);
 
@@ -113,10 +114,7 @@ export default function TrackingScreen() {
       }
     };
 
-    if (Platform.OS === "web") {
-      doStop();
-      return;
-    }
+    if (Platform.OS === "web") { doStop(); return; }
     Alert.alert("Finish Activity", "Stop and save this activity?", [
       { text: "Cancel", style: "cancel" },
       { text: "Stop", style: "destructive", onPress: doStop },
@@ -132,7 +130,7 @@ export default function TrackingScreen() {
   const polylineCoords = coords.map((c) => ({ latitude: c.latitude, longitude: c.longitude }));
 
   return (
-    <View style={[styles.root, { backgroundColor: "#F0F0F0" }]}>
+    <View style={[styles.root, { backgroundColor: "#EEF0F3" }]}>
       <TrackingMap
         mapRef={mapRef}
         initialRegion={initialRegion}
@@ -141,22 +139,18 @@ export default function TrackingScreen() {
         primaryColor={colors.primary}
       />
 
-      {/* Top bar */}
+      {/* Top status bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (isWeb ? 67 : 14) }]}>
-        {/* Activity type pill */}
-        <View style={[styles.pill, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
+        <View style={[styles.pill, styles.shadow]}>
           <View style={[styles.dot, { backgroundColor: isPaused ? "#F59E0B" : isMoving ? "#10B981" : "#9E9E9E" }]} />
-          <Text style={[styles.pillText, { color: "#111", fontFamily: "Inter_600SemiBold" }]}>
+          <Text style={[styles.pillText, { fontFamily: "Inter_600SemiBold" }]}>
             {isPaused ? "Paused" : LABELS[activityType]}
           </Text>
         </View>
 
-        {/* GPS status */}
-        <View style={[styles.pill, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
+        <View style={[styles.pill, styles.shadow]}>
           <View style={[styles.dot, { backgroundColor: dotColor }]} />
-          <Text style={[styles.pillText, { color: "#111", fontFamily: "Inter_500Medium" }]}>
-            {statusLabel}
-          </Text>
+          <Text style={[styles.pillText, { fontFamily: "Inter_500Medium" }]}>{statusLabel}</Text>
         </View>
       </View>
 
@@ -180,16 +174,16 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Main metrics */}
-        <View style={styles.mainMetrics}>
+        {/* Primary metrics */}
+        <View style={styles.primaryRow}>
           <View style={styles.bigMetric}>
-            <Text style={[styles.bigValue, { color: "#111", fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
-            <Text style={[styles.bigLabel, { color: "#6B7280", fontFamily: "Inter_500Medium" }]}>KM</Text>
+            <Text style={[styles.bigVal, { fontFamily: "Inter_700Bold" }]}>{distKm}</Text>
+            <Text style={[styles.bigUnit, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>KM</Text>
           </View>
           <View style={[styles.divV, { backgroundColor: colors.border }]} />
           <View style={styles.bigMetric}>
-            <Text style={[styles.bigValue, { color: "#111", fontFamily: "Inter_700Bold" }]}>{fmtTime(elapsed)}</Text>
-            <Text style={[styles.bigLabel, { color: "#6B7280", fontFamily: "Inter_500Medium" }]}>TIME</Text>
+            <Text style={[styles.bigVal, { fontFamily: "Inter_700Bold" }]}>{fmtTime(elapsed)}</Text>
+            <Text style={[styles.bigUnit, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>TIME</Text>
           </View>
         </View>
 
@@ -202,34 +196,26 @@ export default function TrackingScreen() {
             ...(steps > 0 ? [{ val: String(steps), unit: "steps" }] : []),
             ...(cadence > 0 ? [{ val: String(cadence), unit: "spm" }] : []),
           ].map((m, i) => (
-            <View key={i} style={styles.secondaryStat}>
-              <Text style={[styles.secondaryVal, { color: "#111", fontFamily: "Inter_700Bold" }]}>{m.val}</Text>
-              <Text style={[styles.secondaryUnit, { color: "#6B7280", fontFamily: "Inter_400Regular" }]}>{m.unit}</Text>
+            <View key={i} style={styles.secStat}>
+              <Text style={[styles.secVal, { fontFamily: "Inter_700Bold" }]}>{m.val}</Text>
+              <Text style={[styles.secUnit, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>{m.unit}</Text>
             </View>
           ))}
         </View>
 
-        {/* GPS accuracy bar */}
+        {/* Accuracy bar */}
         <View style={styles.accuracyRow}>
-          <Text style={[styles.accLabel, { color: "#6B7280", fontFamily: "Inter_400Regular" }]}>Accuracy</Text>
+          <Text style={[styles.accLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>Accuracy</Text>
           <View style={[styles.accTrack, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.accFill,
-                {
-                  width: `${Math.round(confidence * 100)}%` as `${number}%`,
-                  backgroundColor: dotColor,
-                },
-              ]}
-            />
+            <View style={[styles.accFill, { width: `${Math.round(confidence * 100)}%` as `${number}%`, backgroundColor: dotColor }]} />
           </View>
           <Text style={[styles.accPct, { color: dotColor, fontFamily: "Inter_600SemiBold" }]}>
-            {elapsed < 3 ? "—" : `${Math.round(confidence * 100)}%`}
+            {elapsed < 4 ? "—" : `${Math.round(confidence * 100)}%`}
           </Text>
         </View>
 
-        {/* Buttons */}
-        <View style={styles.buttons}>
+        {/* Controls */}
+        <View style={styles.controls}>
           <Pressable
             onPress={handlePause}
             style={({ pressed }) => [
@@ -276,14 +262,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: "#fff",
   },
-  pillText: { fontSize: 13 },
+  shadow: {
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  pillText: { fontSize: 13, color: "#111" },
   dot: { width: 8, height: 8, borderRadius: 4 },
   panel: {
     position: "absolute",
@@ -295,7 +284,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     gap: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 8,
   },
@@ -309,26 +298,26 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pauseText: { fontSize: 13 },
-  mainMetrics: {
+  primaryRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 24,
   },
   bigMetric: { alignItems: "center", gap: 2 },
-  bigValue: { fontSize: 44, letterSpacing: -2 },
-  bigLabel: { fontSize: 11, letterSpacing: 2 },
+  bigVal: { fontSize: 44, color: "#111", letterSpacing: -2 },
+  bigUnit: { fontSize: 11, letterSpacing: 2 },
   divV: { width: 1, height: 48 },
   secondaryRow: { flexDirection: "row", justifyContent: "space-around" },
-  secondaryStat: { alignItems: "center", gap: 1 },
-  secondaryVal: { fontSize: 19, letterSpacing: -0.5 },
-  secondaryUnit: { fontSize: 10 },
+  secStat: { alignItems: "center", gap: 1 },
+  secVal: { fontSize: 19, color: "#111", letterSpacing: -0.5 },
+  secUnit: { fontSize: 10 },
   accuracyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   accLabel: { fontSize: 11, width: 55 },
   accTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
   accFill: { height: "100%", borderRadius: 2 },
   accPct: { fontSize: 12, width: 36, textAlign: "right" },
-  buttons: {
+  controls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

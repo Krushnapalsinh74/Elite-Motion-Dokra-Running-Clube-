@@ -8,7 +8,8 @@ interface Coord {
 }
 
 interface TrackingMapProps {
-  mapRef: React.RefObject<MapView>;
+  // any ref so callers don't need to import MapView
+  mapRef?: React.RefObject<any>;
   initialRegion: {
     latitude: number;
     longitude: number;
@@ -28,7 +29,7 @@ export default function TrackingMap({
   primaryColor,
 }: TrackingMapProps) {
   const startCoord = polylineCoords.length > 0 ? polylineCoords[0] : null;
-  const endCoord = polylineCoords.length > 1 ? polylineCoords[polylineCoords.length - 1] : null;
+  const lastCoord = polylineCoords.length > 1 ? polylineCoords[polylineCoords.length - 1] : null;
 
   return (
     <MapView
@@ -41,19 +42,18 @@ export default function TrackingMap({
       mapType="standard"
       showsMyLocationButton={false}
       showsCompass
-      showsScale
     >
       {startCoord && (
         <Marker coordinate={startCoord} pinColor="green" title="Start" />
       )}
-      {endCoord && (
-        <Marker coordinate={endCoord} pinColor={primaryColor} title="Current" />
+      {lastCoord && (
+        <Marker coordinate={lastCoord} pinColor={primaryColor} title="Current" />
       )}
       {polylineCoords.length > 1 && (
         <Polyline
           coordinates={polylineCoords}
           strokeColor={isPaused ? "#9E9E9E" : primaryColor}
-          strokeWidth={4}
+          strokeWidth={5}
           lineCap="round"
           lineJoin="round"
         />

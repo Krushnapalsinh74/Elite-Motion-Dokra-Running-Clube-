@@ -10,25 +10,27 @@ interface TrackingMapProps {
   primaryColor?: string;
 }
 
-export default function TrackingMap({ polylineCoords = [] }: TrackingMapProps) {
-  const count = polylineCoords.length;
+export default function TrackingMap({ polylineCoords = [], isPaused }: TrackingMapProps) {
+  const count = (polylineCoords as unknown[]).length;
   return (
-    <View style={styles.placeholder}>
-      <Feather name="map" size={48} color="#2A2A2A" />
-      <Text style={styles.text}>GPS map tracking active</Text>
-      {count > 0 && <Text style={styles.sub}>{count} location points recorded</Text>}
+    <View style={styles.root}>
+      <Feather name="map-pin" size={40} color="#E85D04" />
+      <Text style={styles.title}>GPS Tracking Active</Text>
+      <Text style={styles.sub}>
+        {isPaused ? "Paused" : "Recording your route..."}{count > 0 ? ` · ${count} points` : ""}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  placeholder: {
+  root: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#111",
+    backgroundColor: "#F0F2F5",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
-  text: { color: "#4A4A4A", fontSize: 15, fontFamily: "Inter_400Regular" },
-  sub: { color: "#3A3A3A", fontSize: 12, fontFamily: "Inter_400Regular" },
+  title: { color: "#333", fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  sub: { color: "#6B7280", fontSize: 13, fontFamily: "Inter_400Regular" },
 });
