@@ -188,6 +188,15 @@ export class ActivityTracker {
     try { this.locationSub?.remove(); } catch {}
     this.locationSub = null;
 
+    // Minimum speed (m/s) before we consider the device as actually moving.
+    // Hardware GPS speed is much more reliable than position-derived speed.
+    const MIN_MOVING_MS: Record<ActivityType, number> = {
+      walking: 0.3,   // ~1 km/h
+      running: 0.4,   // ~1.5 km/h
+      cycling: 0.8,   // ~3 km/h — bikes need more speed before counting
+    };
+    const minMs = MIN_MOVING_MS[this.activityType];
+
     this.locationSub = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.BestForNavigation,
@@ -197,11 +206,16 @@ export class ActivityTracker {
       },
       (loc) => {
         if (this.isPaused) return;
+
+        const hardwareSpeedMs =
+          loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null;
+        const hardwareMoving = hardwareSpeedMs != null ? hardwareSpeedMs >= minMs : null;
+
         const raw = {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
           accuracy: loc.coords.accuracy ?? 50,
-          speed: loc.coords.speed != null && loc.coords.speed >= 0 ? loc.coords.speed : null,
+          speed: hardwareSpeedMs,
           altitude: loc.coords.altitude,
           timestamp: loc.timestamp,
         };
@@ -217,12 +231,24 @@ export class ActivityTracker {
         const filtered = this.gpsEngine.process(raw, this.motionState.isMoving);
         if (!filtered) return;
 
-        if (raw.speed != null) {
-          const gpsSpeedKmh = raw.speed * 3.6;
-          const maxSpeed = this.activityType === "cycling" ? 90 : 40;
-          const clipped = Math.min(gpsSpeedKmh, maxSpeed);
-          this.smoothedSpeedKmh =
-            this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + clipped * SPEED_EMA_ALPHA;
+        // Hardware speed is ground truth — override position-derived isMoving
+        if (hardwareMoving === false) {
+          filtered.isMoving = false;
+        }
+
+        if (hardwareSpeedMs != null) {
+          if (hardwareMoving) {
+            // Actually moving — update EMA with real speed
+            const gpsSpeedKmh = hardwareSpeedMs * 3.6;
+            const maxSpeed = this.activityType === "cycling" ? 90 : 40;
+            const clipped = Math.min(gpsSpeedKmh, maxSpeed);
+            this.smoothedSpeedKmh =
+              this.smoothedSpeedKmh * (1 - SPEED_EMA_ALPHA) + clipped * SPEED_EMA_ALPHA;
+          } else {
+            // Stationary — decay speed to zero quickly
+            this.smoothedSpeedKmh = this.smoothedSpeedKmh * 0.5;
+            if (this.smoothedSpeedKmh < 0.1) this.smoothedSpeedKmh = 0;
+          }
         }
 
         this._acceptPoint(filtered);
